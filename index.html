@@ -13,7 +13,6 @@
   --hot: #ff6b35;
   --green: #39d98a;
   --warn: #ffcc00;
-  --danger: #ff4444;
   --muted: #4a6a8a;
   --text: #ddeeff;
   --mono: 'DM Mono', monospace;
@@ -44,11 +43,9 @@ html, body {
   position: relative;
 }
 
-/* ── FETCH STATUS BAR (replaces error banner) ── */
 .status-bar {
   position: absolute;
-  top: 10%;
-  left: 0; right: 0;
+  top: 10%; left: 0; right: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -74,10 +71,7 @@ html, body {
   border-bottom: 1px solid rgba(255,68,68,0.3);
   color: #ff8888;
 }
-.spin {
-  display: inline-block;
-  animation: spin 1s linear infinite;
-}
+.spin { display: inline-block; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── HEADER ── */
@@ -105,12 +99,7 @@ html, body {
 .upd-val { font-size: 0.9vmin; color: var(--muted); }
 
 /* ── BODY ── */
-.body {
-  flex: 1;
-  display: flex;
-  min-height: 0;
-  overflow: hidden;
-}
+.body { flex: 1; display: flex; min-height: 0; overflow: hidden; }
 
 /* ── LEFT: 4 stacked 12-hour tables ── */
 .tbl-col {
@@ -152,22 +141,10 @@ html, body {
   width: 1em; height: 1px;
   background: var(--accent); opacity: 0.5;
 }
-.blk-date {
-  font-family: var(--display);
-  font-size: 1.25vmin;
-  color: var(--text);
-  letter-spacing: 0.07em;
-}
-.blk-span {
-  font-size: 0.62vmin;
-  color: var(--muted);
-  opacity: 0.7;
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
+.blk-date { font-family: var(--display); font-size: 1.25vmin; color: var(--text); letter-spacing: 0.07em; }
+.blk-span { font-size: 0.62vmin; color: var(--muted); opacity: 0.7; }
+
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 table colgroup col.rl { width: 12%; }
 table colgroup col    { width: calc(88% / 12); }
 th, td {
@@ -197,13 +174,7 @@ thead tr th { border-top: none; }
 .co { color: var(--green); }
 
 /* ── RIGHT: 3 stacked charts ── */
-.charts-col {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  min-width: 0;
-}
+.charts-col { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
 .chart-panel {
   flex: 1;
   display: flex;
@@ -231,10 +202,7 @@ thead tr th { border-top: none; }
   width: 1em; height: 1px;
   background: var(--accent); opacity: 0.5;
 }
-.chart-panel svg {
-  flex: 1; width: 100%; min-height: 0;
-  display: block; overflow: visible;
-}
+.chart-panel svg { flex: 1; width: 100%; min-height: 0; display: block; overflow: visible; }
 
 /* ── FOOTER ── */
 .ftr {
@@ -260,13 +228,11 @@ thead tr th { border-top: none; }
 <body>
 <div class="frame">
 
-  <!-- STATUS BAR -->
   <div class="status-bar" id="status-bar">
     <span id="status-icon"></span>
     <span id="status-msg"></span>
   </div>
 
-  <!-- HEADER -->
   <div class="hdr">
     <div>
       <div class="loc">HONOLULU · NORTH WAIKIKI</div>
@@ -300,15 +266,8 @@ thead tr th { border-top: none; }
     </div>
   </div>
 
-  <!-- BODY -->
   <div class="body">
-
-    <!-- LEFT: 4 stacked 12h blocks (JS-rendered) -->
-    <div class="tbl-col" id="tbl-col">
-      <!-- populated by renderTables() -->
-    </div>
-
-    <!-- RIGHT: 3 charts -->
+    <div class="tbl-col" id="tbl-col"></div>
     <div class="charts-col">
       <div class="chart-panel">
         <div class="sec-lbl">Temperature (°F)</div>
@@ -323,10 +282,8 @@ thead tr th { border-top: none; }
         <svg id="cWind" viewBox="0 0 260 78" preserveAspectRatio="none"></svg>
       </div>
     </div>
-
   </div>
 
-  <!-- FOOTER -->
   <div class="ftr">
     <div class="ftr-src">NOAA / NWS HONOLULU · forecast.weather.gov · 21.31°N 157.86°W</div>
     <div class="ftr-next">
@@ -339,106 +296,65 @@ thead tr th { border-top: none; }
 <script>
 'use strict';
 
-// ─────────────────────────────────────────────────────────────
-// CONFIG
-// Set CORS_PROXY to '' if running with --disable-web-security,
-// or supply a proxy such as 'https://corsproxy.io/?url='
-// ─────────────────────────────────────────────────────────────
-const CORS_PROXY         = 'https://corsproxy.io/?url=';
-const NWS_URL            = 'https://forecast.weather.gov/MapClick.php'
-                         + '?lat=21.3069&lon=-157.8583&unit=0&lg=english&FcstType=digital';
+// ── CONFIG ────────────────────────────────────────────────────
+// Flask serves /forecast as JSON — same origin, no CORS needed.
 const UPDATE_INTERVAL_MS = 10 * 60 * 1000;
-const HOURS_WANTED       = 48;
 
-// ─────────────────────────────────────────────────────────────
-// STATUS BAR
-// ─────────────────────────────────────────────────────────────
+// ── STATUS BAR ───────────────────────────────────────────────
 const statusBar  = document.getElementById('status-bar');
 const statusIcon = document.getElementById('status-icon');
 const statusMsg  = document.getElementById('status-msg');
-let statusTimer  = null;
+let   statusTimer = null;
 
 function showStatus(type, msg, autohideMs = 0) {
   clearTimeout(statusTimer);
-  statusBar.className = `status-bar visible ${type}`;
+  statusBar.className    = `status-bar visible ${type}`;
   statusIcon.textContent = type === 'fetching' ? '↻' : '⚠';
   statusIcon.className   = type === 'fetching' ? 'spin' : '';
   statusMsg.textContent  = msg;
-  if (autohideMs) statusTimer = setTimeout(() => { statusBar.className = 'status-bar'; }, autohideMs);
+  if (autohideMs) {
+    statusTimer = setTimeout(() => { statusBar.className = 'status-bar'; }, autohideMs);
+  }
 }
-
 function hideStatus() {
   clearTimeout(statusTimer);
   statusBar.className = 'status-bar';
 }
 
-// ─────────────────────────────────────────────────────────────
-// FETCH & PARSE
-// ─────────────────────────────────────────────────────────────
-function extractRow(line, label, n) {
-  const suffix  = '.*?<b>([^<]+)</b>'.repeat(n);
-  const pattern = new RegExp(label + suffix, 's');
-  const m       = line.match(pattern);
-  return m ? m.slice(1) : Array(n).fill('--');
-}
-
+// ── FETCH ─────────────────────────────────────────────────────
 async function fetchWeatherData() {
-  const url = CORS_PROXY
-    ? CORS_PROXY + encodeURIComponent(NWS_URL)
-    : NWS_URL;
-
-  const response = await fetch(url);
+  const response = await fetch('/forecast');
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-  const html  = await response.text();
-  const lines = html.split('\n').filter(l => l.includes('<b>Date'));
-  if (!lines.length) throw new Error('Forecast table not found');
-
-  const out = { hour: [], direction: [], speed: [], temp: [], precip: [] };
-
-  for (const line of lines) {
-    if (out.hour.length >= HOURS_WANTED) break;
-    const n     = Math.min(HOURS_WANTED - out.hour.length, 24);
-    const hours = extractRow(line, 'Hour', n);
-    if (!hours[0] || hours[0] === '--') continue;
-
-    out.hour     .push(...hours.map(v => parseInt(v, 10)));
-    out.direction.push(...extractRow(line, 'Wind Dir',                n));
-    out.speed    .push(...extractRow(line, 'Surface Wind',            n).map(v => parseInt(v, 10)));
-    out.temp     .push(...extractRow(line, 'Temperature',             n).map(v => parseInt(v, 10)));
-    out.precip   .push(...extractRow(line, 'Precipitation Potential', n).map(v => parseInt(v, 10)));
-  }
-
-  if (!out.hour.length) throw new Error('No data extracted');
-  return out;
+  const data = await response.json();
+  if (data.error) throw new Error(data.error);
+  if (!data.hour || !data.hour.length) throw new Error('Empty forecast data');
+  return data;
 }
 
-// ─────────────────────────────────────────────────────────────
-// TABLE RENDERING
-// ─────────────────────────────────────────────────────────────
+// ── TABLE RENDERING ───────────────────────────────────────────
 const DAYS   = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
 const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 
 function fmtDate(d) {
   return `${DAYS[d.getDay()]} ${MONTHS[d.getMonth()]} ${d.getDate()}`;
 }
+function fmtHour(h) {
+  if (h === 0)  return '12AM';
+  if (h < 12)   return h + 'AM';
+  if (h === 12) return '12PM';
+  return (h - 12) + 'PM';
+}
 
-// Build a 12-column table block DOM element for a 12-hour slice.
-// nowIdx: index within this slice that should get the .nc highlight (-1 = none).
 function makeBlock(slice, label, span, nowIdx) {
   const block = document.createElement('div');
   block.className = 'block';
+  block.innerHTML = `
+    <div class="blk-lbl">
+      <div class="blk-tag">Forecast</div>
+      <div class="blk-date">${label}</div>
+      <div class="blk-span">${span}</div>
+    </div>`;
 
-  // label row
-  const lbl = document.createElement('div');
-  lbl.className = 'blk-lbl';
-  lbl.innerHTML = `
-    <div class="blk-tag">Forecast</div>
-    <div class="blk-date">${label}</div>
-    <div class="blk-span">${span}</div>`;
-  block.appendChild(lbl);
-
-  // table
   const table = document.createElement('table');
   const cg    = document.createElement('colgroup');
   const rlCol = document.createElement('col');
@@ -447,12 +363,10 @@ function makeBlock(slice, label, span, nowIdx) {
   for (let i = 0; i < 12; i++) cg.appendChild(document.createElement('col'));
   table.appendChild(cg);
 
-  // thead
   const thead = document.createElement('thead');
   const hrow  = document.createElement('tr');
   const thRl  = document.createElement('th');
-  thRl.className   = 'rl';
-  thRl.textContent = 'Hour';
+  thRl.className = 'rl'; thRl.textContent = 'Hour';
   hrow.appendChild(thRl);
   slice.hour.forEach((h, i) => {
     const th = document.createElement('th');
@@ -463,29 +377,24 @@ function makeBlock(slice, label, span, nowIdx) {
   thead.appendChild(hrow);
   table.appendChild(thead);
 
-  // tbody
   const tbody = document.createElement('tbody');
-  const rows  = [
+  [
     { label: 'Dir',    key: 'direction' },
     { label: 'Wind',   key: 'speed'     },
     { label: 'Temp',   key: 'temp'      },
     { label: 'Precip', key: 'precip'    },
-  ];
-
-  rows.forEach(({ label: rl, key }) => {
+  ].forEach(({ label: rl, key }) => {
     const tr   = document.createElement('tr');
     const tdRl = document.createElement('td');
-    tdRl.className   = 'rl';
-    tdRl.textContent = rl;
+    tdRl.className = 'rl'; tdRl.textContent = rl;
     tr.appendChild(tdRl);
-
     slice[key].forEach((v, i) => {
-      const td = document.createElement('td');
+      const td  = document.createElement('td');
       td.textContent = v;
       const cls = [];
-      if (i === nowIdx) cls.push('nc');
-      if (key === 'speed'  && v > 35) cls.push('cw');
-      if (key === 'precip' && v > 50) cls.push('cw');
+      if (i === nowIdx)                cls.push('nc');
+      if (key === 'speed'  && v > 35)  cls.push('cw');
+      if (key === 'precip' && v > 50)  cls.push('cw');
       if (key === 'temp'   && v >= 75) cls.push('ch');
       if (key === 'precip' && v <= 20) cls.push('co');
       if (cls.length) td.className = cls.join(' ');
@@ -493,27 +402,20 @@ function makeBlock(slice, label, span, nowIdx) {
     });
     tbody.appendChild(tr);
   });
-
   table.appendChild(tbody);
   block.appendChild(table);
   return block;
 }
 
 function renderTables(data) {
-  const col = document.getElementById('tbl-col');
-  col.innerHTML = '';
-
-  // We have 48 hours; split into four 12-hour slices.
-  // Slice 0 starts at data.hour[0] (current hour in HST).
-  // The "now" highlight applies only to index 0 of slice 0.
-  const sliceLen = 12;
+  const col      = document.getElementById('tbl-col');
+  col.innerHTML  = '';
+  const sliceLen  = 12;
   const numSlices = Math.floor(data.hour.length / sliceLen);
 
-  // Compute a starting calendar date in HST
   const hstNow = new Date(
     new Date().toLocaleString('en-US', { timeZone: 'Pacific/Honolulu' })
   );
-
   let cursor = new Date(hstNow);
   cursor.setHours(data.hour[0], 0, 0, 0);
 
@@ -527,40 +429,20 @@ function renderTables(data) {
       precip:    data.precip   .slice(start, start + sliceLen),
     };
 
-    // Label: start date
-    const startDate  = new Date(cursor);
-    const label      = fmtDate(startDate);
-
-    // Span string: e.g. "7PM – SAT 6AM" or "7AM – 6PM"
-    const endCursor  = new Date(cursor);
+    const startDate = new Date(cursor);
+    const endCursor = new Date(cursor);
     endCursor.setHours(endCursor.getHours() + sliceLen - 1);
-    const endDate    = new Date(endCursor);
+    const crossDay  = startDate.getDate() !== endCursor.getDate();
+    const span      = crossDay
+      ? `${fmtHour(slice.hour[0])} – ${DAYS[endCursor.getDay()]} ${fmtHour(slice.hour[sliceLen - 1])}`
+      : `${fmtHour(slice.hour[0])} – ${fmtHour(slice.hour[sliceLen - 1])}`;
 
-    function fmtHour(h) {
-      if (h === 0)  return '12AM';
-      if (h < 12)   return h + 'AM';
-      if (h === 12) return '12PM';
-      return (h - 12) + 'PM';
-    }
-
-    const startH = slice.hour[0];
-    const endH   = slice.hour[slice.hour.length - 1];
-    const crossDay = startDate.getDate() !== endDate.getDate();
-    const span   = crossDay
-      ? `${fmtHour(startH)} – ${DAYS[endDate.getDay()]} ${fmtHour(endH)}`
-      : `${fmtHour(startH)} – ${fmtHour(endH)}`;
-
-    const nowIdx = s === 0 ? 0 : -1;
-    col.appendChild(makeBlock(slice, label, span, nowIdx));
-
-    // Advance cursor by 12 hours for the next slice
+    col.appendChild(makeBlock(slice, fmtDate(startDate), span, s === 0 ? 0 : -1));
     cursor.setHours(cursor.getHours() + sliceLen);
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// SVG CHARTS
-// ─────────────────────────────────────────────────────────────
+// ── SVG CHARTS ────────────────────────────────────────────────
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const MONO   = 'DM Mono, monospace';
 
@@ -586,14 +468,14 @@ function drawChart(id, W, H, data, mn, mx, opts = {}) {
   const xp = i => PL + (i / (N - 1)) * cW;
   const yp = v => PT + (1 - (v - mn) / (mx - mn)) * cH;
 
-  // h-grid
+  // horizontal grid
   for (let s = 0; s <= 4; s++) {
     const v = mn + (mx - mn) * s / 4, y = yp(v);
     svg.appendChild(svgEl('line', { x1:PL, y1:y, x2:W-PR, y2:y, stroke:'#1a2d48', 'stroke-width':0.4 }));
     svgTxt(svg, Math.round(v), PL - 3, y + 3, 6, '#4a6a8a', 'end');
   }
 
-  // v-ticks + labels; dividers every 12h
+  // vertical ticks + 12h block dividers
   const xLabels = opts.xLabels || [];
   for (let i = 0; i < N; i++) {
     if (i % 3 !== 0) continue;
@@ -605,7 +487,9 @@ function drawChart(id, W, H, data, mn, mx, opts = {}) {
       'stroke-width': isDiv ? 0.8 : (i % 6 === 0 ? 0.5 : 0.2),
       ...(isDiv ? { 'stroke-dasharray': '2,2' } : {}),
     }));
-    if (i % 6 === 0 && xLabels[i]) svgTxt(svg, xLabels[i], x, H - PB + 9, 6, '#4a6a8a', 'middle');
+    if (i % 6 === 0 && xLabels[i]) {
+      svgTxt(svg, xLabels[i], x, H - PB + 9, 6, '#4a6a8a', 'middle');
+    }
   }
 
   // now-line
@@ -614,6 +498,7 @@ function drawChart(id, W, H, data, mn, mx, opts = {}) {
     stroke:'#00c8ff', 'stroke-width':0.9, 'stroke-dasharray':'3,2', opacity:0.6,
   }));
 
+  // warning threshold
   if (opts.warnAt != null) {
     const yw = yp(opts.warnAt);
     svg.appendChild(svgEl('line', { x1:PL, y1:yw, x2:W-PR, y2:yw,
@@ -632,7 +517,8 @@ function drawChart(id, W, H, data, mn, mx, opts = {}) {
     svg.appendChild(svgEl('line', { x1:PL, y1:y50, x2:W-PR, y2:y50,
       stroke:'#ff4444', 'stroke-width':0.55, 'stroke-dasharray':'3,3', opacity:0.4 }));
   } else {
-    const lineD = data.map((v, i) => `${i === 0 ? 'M' : 'L'}${xp(i).toFixed(1)},${yp(v).toFixed(1)}`).join(' ');
+    const lineD = data.map((v, i) =>
+      `${i === 0 ? 'M' : 'L'}${xp(i).toFixed(1)},${yp(v).toFixed(1)}`).join(' ');
     const areaD = lineD + ` L${xp(N-1).toFixed(1)},${H-PB} L${xp(0).toFixed(1)},${H-PB} Z`;
     svg.appendChild(svgEl('path', { d:areaD, fill:opts.areaColor || 'rgba(0,200,255,0.07)', stroke:'none' }));
     svg.appendChild(svgEl('path', { d:lineD, fill:'none', stroke:opts.lineColor || '#00c8ff',
@@ -640,41 +526,29 @@ function drawChart(id, W, H, data, mn, mx, opts = {}) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// RENDER ALL
-// ─────────────────────────────────────────────────────────────
+// ── RENDER ALL ────────────────────────────────────────────────
 function renderAll(data) {
-  const N = data.hour.length;
-
-  // Header strip
-  const nowHourEl = document.getElementById('now-hour');
-  nowHourEl.childNodes[0].textContent = data.hour[0];
+  document.getElementById('now-hour').childNodes[0].textContent = data.hour[0];
   document.getElementById('now-dir')   .textContent = data.direction[0];
   document.getElementById('now-wind')  .textContent = data.speed[0];
   document.getElementById('now-temp')  .textContent = data.temp[0];
   document.getElementById('now-precip').textContent = data.precip[0];
 
-  // Color the header values
-  document.getElementById('now-wind') .className = 'now-val' + (data.speed[0]  > 35 ? ' c-warn' : '');
-  document.getElementById('now-temp') .className = 'now-val' + (data.temp[0]   >= 75 ? ' c-hot'  : '');
-  document.getElementById('now-precip').className= 'now-val' + (data.precip[0] > 50 ? ' c-warn' : ' c-ok');
+  document.getElementById('now-wind')  .className = 'now-val' + (data.speed[0]  > 35  ? ' c-warn' : '');
+  document.getElementById('now-temp')  .className = 'now-val' + (data.temp[0]   >= 75 ? ' c-hot'  : '');
+  document.getElementById('now-precip').className = 'now-val' + (data.precip[0] > 50  ? ' c-warn' : ' c-ok');
 
-  // Last-updated time
-  const hst = new Intl.DateTimeFormat('en-US', {
+  document.getElementById('upd-time').textContent = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Pacific/Honolulu',
     hour: 'numeric', minute: '2-digit', hour12: true,
     month: 'short', day: 'numeric',
-  }).format(new Date());
-  document.getElementById('upd-time').textContent = hst + ' HST';
+  }).format(new Date()) + ' HST';
 
-  // Tables
   renderTables(data);
 
-  // Charts — x-axis labels derived from hour array
   const xLabels = data.hour.map(h =>
     h === 0 ? '12A' : h < 12 ? h + 'A' : h === 12 ? '12P' : (h - 12) + 'P'
   );
-
   drawChart('cTemp',   260, 78, data.temp,   55, 85,
     { lineColor:'#ff6b35', areaColor:'rgba(255,107,53,0.08)', xLabels });
   drawChart('cPrecip', 260, 78, data.precip,  0, 100,
@@ -683,24 +557,20 @@ function renderAll(data) {
     { lineColor:'#39d98a', areaColor:'rgba(57,217,138,0.07)', warnAt:35, xLabels });
 }
 
-// ─────────────────────────────────────────────────────────────
-// UPDATE LOOP
-// ─────────────────────────────────────────────────────────────
+// ── UPDATE LOOP ───────────────────────────────────────────────
 async function update() {
-  showStatus('fetching', 'FETCHING LATEST FORECAST DATA…');
+  showStatus('fetching', 'FETCHING LATEST FORECAST…');
   try {
     const data = await fetchWeatherData();
     renderAll(data);
     hideStatus();
   } catch (err) {
     console.error('[weather] fetch failed:', err);
-    showStatus('error', `DATA FETCH FAILED — DISPLAYING LAST KNOWN VALUES (${err.message})`, 8000);
+    showStatus('error', `FETCH FAILED — DISPLAYING LAST KNOWN VALUES (${err.message})`, 8000);
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// COUNTDOWN
-// ─────────────────────────────────────────────────────────────
+// ── COUNTDOWN ─────────────────────────────────────────────────
 let secsLeft = UPDATE_INTERVAL_MS / 1000;
 const cdEl   = document.getElementById('cd');
 
@@ -716,9 +586,6 @@ setInterval(() => {
   update();
 }, UPDATE_INTERVAL_MS);
 
-// ─────────────────────────────────────────────────────────────
-// BOOT
-// ─────────────────────────────────────────────────────────────
 update();
 </script>
 </body>
