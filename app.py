@@ -1,3 +1,4 @@
+import re
 import requests
 from flask import Flask, jsonify, send_from_directory
 
@@ -7,6 +8,8 @@ LAT = 21.3069
 LON = -157.8583
 POINTS_URL = f'https://api.weather.gov/points/{LAT},{LON}'
 HOURS_WANTED = 48
+GOES_SECTOR_URL = 'https://www.star.nesdis.noaa.gov/goes/sector.php?sat=G18&sector=hi'
+GOES_CDN_PREFIX = 'https://cdn.star.nesdis.noaa.gov/'
 
 # Cache the hourly forecast URL — gridpoint mapping never changes
 _forecast_hourly_url = None
@@ -54,7 +57,20 @@ def scrape_forecast():
         'speed':     [parse_wind_speed(p['windSpeed']) for p in periods],
         'temp':      [p['temperature'] for p in periods],
         'precip':    [p['probabilityOfPrecipitation']['value'] or 0 for p in periods],
+        'icon':      [p.get('icon', '') for p in periods],
+        'short':     [p.get('shortForecast', '') for p in periods],
     }
+
+
+def get_goes_airmass_url():
+    resp = requests.get(GOES_SECTOR_URL, timeout=15)
+    resp.raise_for_status()
+    html = resp.text
+    matches = re.findall(r'(?:https://cdn\.star\.nesdis\.noaa\.gov/)?GOES18/ABI/SECTOR/hi/AirMass/[A-Za-z0-9._/-]+?\.gif', html)
+    if not matches:
+        raise ValueError('No GOES Air Mass GIF URL found on NOAA sector page')
+    latest = matches[-1]
+    return latest if latest.startswith('http') else GOES_CDN_PREFIX + latest
 
 
 @app.route('/debug')
@@ -84,6 +100,20 @@ def forecast():
         app.logger.error(msg)
         return jsonify({'error': msg}), 502
     except (ValueError, KeyError) as e:
+        msg = f'Parse error: {e}'
+        app.logger.error(msg)
+        return jsonify({'error': msg}), 502
+
+
+@app.route('/goes-airmass')
+def goes_airmass():
+    try:
+        return jsonify({'url': get_goes_airmass_url()})
+    except requests.RequestException as e:
+        msg = f'Upstream request failed: {e}'
+        app.logger.error(msg)
+        return jsonify({'error': msg}), 502
+    except ValueError as e:
         msg = f'Parse error: {e}'
         app.logger.error(msg)
         return jsonify({'error': msg}), 502
