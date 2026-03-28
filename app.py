@@ -9,6 +9,7 @@ LON = -157.8583
 
 POINTS_URL = f'https://api.weather.gov/points/{LAT},{LON}'
 HOURS_WANTED = 48
+
 GOES_SECTOR_URL = 'https://www.star.nesdis.noaa.gov/goes/sector.php?sat=G18&sector=hi'
 GOES_CDN_PREFIX = 'https://cdn.star.nesdis.noaa.gov/'
 
