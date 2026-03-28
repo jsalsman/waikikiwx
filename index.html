@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Waikiki Weather</title>
+<title>Honolulu Weather</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Bebas+Neue&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -17,6 +17,8 @@
   --text: #ddeeff;
   --mono: 'DM Mono', monospace;
   --display: 'Bebas Neue', sans-serif;
+  /* 10pt at 96dpi = 13.3px; on a 1080p screen 1vmin = 10.8px → 1.25vmin */
+  --fs: 1.25vmin;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -51,7 +53,7 @@ html, body {
   justify-content: center;
   gap: 0.6em;
   padding: 0.35em 1em;
-  font-size: 0.82vmin;
+  font-size: var(--fs);
   letter-spacing: 0.07em;
   z-index: 50;
   opacity: 0;
@@ -86,17 +88,17 @@ html, body {
   border-bottom: 1px solid var(--border);
 }
 .loc { font-family: var(--display); font-size: 3vmin; letter-spacing: 0.1em; color: var(--accent); }
-.coords { font-size: 0.9vmin; color: var(--muted); margin-top: 0.15em; }
+.coords { font-size: var(--fs); color: var(--muted); margin-top: 0.15em; }
 .now-grid { display: flex; gap: 2.2em; }
 .now-item { text-align: center; }
-.now-lbl { font-size: 0.72vmin; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+.now-lbl { font-size: var(--fs); color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
 .now-val { font-family: var(--display); font-size: 2.8vmin; line-height: 1.1; }
 .c-hot  { color: var(--hot); }
 .c-warn { color: var(--warn); }
 .c-ok   { color: var(--green); }
 .upd { text-align: right; }
-.upd-lbl { font-size: 0.65vmin; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.5; }
-.upd-val { font-size: 0.9vmin; color: var(--muted); }
+.upd-lbl { font-size: var(--fs); color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.5; }
+.upd-val { font-size: var(--fs); color: var(--muted); }
 
 /* ── BODY ── */
 .body { flex: 1; display: flex; min-height: 0; overflow: hidden; }
@@ -127,7 +129,7 @@ html, body {
   margin-bottom: 0.3em;
 }
 .blk-tag {
-  font-size: 0.78vmin;
+  font-size: var(--fs);
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.13em;
@@ -141,8 +143,8 @@ html, body {
   width: 1em; height: 1px;
   background: var(--accent); opacity: 0.5;
 }
-.blk-date { font-family: var(--display); font-size: 1.5vmin; color: var(--text); letter-spacing: 0.07em; }
-.blk-span { font-size: 0.78vmin; color: var(--muted); opacity: 0.7; }
+.blk-date { font-family: var(--display); font-size: 1.6vmin; color: var(--text); letter-spacing: 0.07em; }
+.blk-span { font-size: var(--fs); color: var(--muted); opacity: 0.7; }
 
 table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 table colgroup col.rl { width: 12%; }
@@ -152,13 +154,13 @@ th, td {
   white-space: nowrap;
   overflow: hidden;
   padding: 0.2em 0.35em 0.2em 0;
-  font-size: 1.1vmin;
+  font-size: var(--fs);
 }
-th { color: var(--muted); font-weight: 400; font-size: 0.95vmin; }
+th { color: var(--muted); font-weight: 400; font-size: var(--fs); }
 th.rl, td.rl {
   text-align: left;
   color: var(--muted);
-  font-size: 0.92vmin;
+  font-size: var(--fs);
   font-weight: 500;
   padding-left: 0;
 }
@@ -186,7 +188,7 @@ thead tr th { border-top: none; }
 }
 .chart-panel:last-child { border-bottom: none; }
 .chart-panel .sec-lbl {
-  font-size: 0.88vmin;
+  font-size: var(--fs);
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.13em;
@@ -215,8 +217,8 @@ thead tr th { border-top: none; }
   background: var(--panel);
   border-top: 1px solid var(--border);
 }
-.ftr-src { font-size: 0.65vmin; color: var(--muted); opacity: 0.35; letter-spacing: 0.05em; }
-.ftr-next { font-size: 0.7vmin; color: var(--muted); display: flex; align-items: center; gap: 0.5em; }
+.ftr-src { font-size: var(--fs); color: var(--muted); opacity: 0.35; letter-spacing: 0.05em; }
+.ftr-next { font-size: var(--fs); color: var(--muted); display: flex; align-items: center; gap: 0.5em; }
 .pulse {
   width: 0.5vmin; height: 0.5vmin; border-radius: 50%;
   background: var(--green);
@@ -472,7 +474,7 @@ function drawChart(id, W, H, data, mn, mx, opts = {}) {
   for (let s = 0; s <= 4; s++) {
     const v = mn + (mx - mn) * s / 4, y = yp(v);
     svg.appendChild(svgEl('line', { x1:PL, y1:y, x2:W-PR, y2:y, stroke:'#1a2d48', 'stroke-width':0.4 }));
-    svgTxt(svg, Math.round(v), PL - 3, y + 3, 8, '#4a6a8a', 'end');
+    svgTxt(svg, Math.round(v), PL - 3, y + 3, 9, '#4a6a8a', 'end');
   }
 
   // vertical ticks + 12h block dividers
@@ -488,7 +490,7 @@ function drawChart(id, W, H, data, mn, mx, opts = {}) {
       ...(isDiv ? { 'stroke-dasharray': '2,2' } : {}),
     }));
     if (i % 6 === 0 && xLabels[i]) {
-      svgTxt(svg, xLabels[i], x, H - PB + 9, 8, '#4a6a8a', 'middle');
+      svgTxt(svg, xLabels[i], x, H - PB + 9, 9, '#4a6a8a', 'middle');
     }
   }
 
