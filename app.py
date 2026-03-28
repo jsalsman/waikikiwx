@@ -16,7 +16,9 @@ HEADERS = {
     ),
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
     'Referer': 'https://www.weather.gov/',
+    'Connection': 'keep-alive',
 }
 
 HOURS_WANTED = 48
@@ -30,41 +32,58 @@ def extract_row(line, label, n):
 
 
 def scrape_forecast():
-    resp = requests.get(NWS_URL, headers=HEADERS, timeout=15)
-    resp.raise_for_status()
+    # Try up to 3 times in case NWS is flaky
+    last_err = None
+    for attempt in range(3):
+        try:
+            resp = requests.get(
+                NWS_URL,
+                headers=HEADERS,
+                timeout=20,
+                allow_redirects=True,
+            )
+            resp.raise_for_status()
 
-    # The forecast table lives on a single very long line containing "<b>Date"
-    lines = [l for l in resp.text.splitlines() if '<b>Date' in l]
-    if not lines:
-        raise ValueError('Forecast table not found in NWS response')
+            lines = [l for l in resp.text.splitlines() if '<b>Date' in l]
+            if not lines:
+                raise ValueError(
+                    f'Forecast table not found (HTTP {resp.status_code}, '
+                    f'{len(resp.text)} bytes)'
+                )
 
-    out = {'hour': [], 'direction': [], 'speed': [], 'temp': [], 'precip': []}
+            out = {'hour': [], 'direction': [], 'speed': [], 'temp': [], 'precip': []}
 
-    for line in lines:
-        remaining = HOURS_WANTED - len(out['hour'])
-        if remaining <= 0:
-            break
-        n = min(remaining, 24)
+            for line in lines:
+                remaining = HOURS_WANTED - len(out['hour'])
+                if remaining <= 0:
+                    break
+                n = min(remaining, 24)
 
-        hours = extract_row(line, 'Hour', n)
-        if not hours or hours[0] == '--':
+                hours = extract_row(line, 'Hour', n)
+                if not hours or hours[0] == '--':
+                    continue
+
+                out['hour']     .extend(int(h) for h in hours)
+                out['direction'].extend(extract_row(line, 'Wind Dir',                n))
+                out['speed']    .extend(int(v) for v in extract_row(line, 'Surface Wind',            n))
+                out['temp']     .extend(int(v) for v in extract_row(line, 'Temperature',             n))
+                out['precip']   .extend(int(v) for v in extract_row(line, 'Precipitation Potential', n))
+
+            if not out['hour']:
+                raise ValueError('Regex extracted no data from NWS response')
+
+            return out
+
+        except (requests.RequestException, ValueError) as e:
+            last_err = e
             continue
 
-        out['hour']     .extend(int(h) for h in hours)
-        out['direction'].extend(extract_row(line, 'Wind Dir',                n))
-        out['speed']    .extend(int(v) for v in extract_row(line, 'Surface Wind',            n))
-        out['temp']     .extend(int(v) for v in extract_row(line, 'Temperature',             n))
-        out['precip']   .extend(int(v) for v in extract_row(line, 'Precipitation Potential', n))
-
-    if not out['hour']:
-        raise ValueError('Regex extracted no data from NWS response')
-
-    return out
+    raise last_err
 
 
 @app.route('/')
 def index():
-    return send_from_directory('.', 'index.html')
+    return send_from_directory('.', 'index.html', mimetype='text/html')
 
 
 @app.route('/forecast')
@@ -73,9 +92,13 @@ def forecast():
         data = scrape_forecast()
         return jsonify(data)
     except requests.RequestException as e:
-        return jsonify({'error': f'Upstream request failed: {e}'}), 502
+        msg = f'Upstream request failed: {e}'
+        app.logger.error(msg)
+        return jsonify({'error': msg}), 502
     except (ValueError, re.error) as e:
-        return jsonify({'error': f'Parse error: {e}'}), 502
+        msg = f'Parse error: {e}'
+        app.logger.error(msg)
+        return jsonify({'error': msg}), 502
 
 
 if __name__ == '__main__':
