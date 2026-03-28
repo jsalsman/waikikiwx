@@ -1,84 +1,72 @@
-import re
 import requests
 from flask import Flask, jsonify, send_from_directory
 
 app = Flask(__name__, static_folder='.')
 
-NWS_URL = (
-    'https://forecast.weather.gov/MapClick.php'
-    '?lat=21.3069&lon=-157.8583&unit=0&lg=english&FcstType=digital'
-)
-
-HEADERS = {
-    'User-Agent': (
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 '
-        '(KHTML, like Gecko) Chrome/124.0 Safari/537.36'
-    ),
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Accept-Encoding': 'gzip, deflate, br',
-    'Referer': 'https://www.weather.gov/',
-    'Connection': 'keep-alive',
-}
-
+LAT = 21.3069
+LON = -157.8583
+POINTS_URL = f'https://api.weather.gov/points/{LAT},{LON}'
 HOURS_WANTED = 48
 
+# Cache the hourly forecast URL — gridpoint mapping never changes
+_forecast_hourly_url = None
 
-def extract_row(line, label, n):
-    suffix = r'.*?<b>([^<]+)</b>' * n
-    pattern = re.compile(label + suffix, re.DOTALL)
-    m = pattern.search(line)
-    return list(m.groups()) if m else ['--'] * n
+HEADERS = {
+    'User-Agent': 'waikikiwx (github.com/jsalsman/waikikiwx)',
+    'Accept': 'application/geo+json',
+}
+
+
+def get_forecast_hourly_url():
+    global _forecast_hourly_url
+    if _forecast_hourly_url:
+        return _forecast_hourly_url
+    resp = requests.get(POINTS_URL, headers=HEADERS, timeout=15)
+    resp.raise_for_status()
+    _forecast_hourly_url = resp.json()['properties']['forecastHourly']
+    return _forecast_hourly_url
+
+
+def parse_wind_speed(s):
+    # "20 mph" or "15 to 20 mph" — take the higher number
+    import re
+    nums = re.findall(r'\d+', s or '')
+    return max(int(n) for n in nums) if nums else 0
+
+
+def hour_from_iso(iso):
+    # "2026-03-28T19:00:00-10:00" → 19
+    return int(iso.split('T')[1][:2])
 
 
 def scrape_forecast():
-    # Try up to 3 times in case NWS is flaky
-    last_err = None
-    for attempt in range(3):
-        try:
-            resp = requests.get(
-                NWS_URL,
-                headers=HEADERS,
-                timeout=20,
-                allow_redirects=True,
-            )
-            resp.raise_for_status()
+    url = get_forecast_hourly_url()
+    resp = requests.get(url, headers=HEADERS, timeout=15)
+    resp.raise_for_status()
 
-            lines = [l for l in resp.text.splitlines() if '<b>Date' in l]
-            if not lines:
-                raise ValueError(
-                    f'Forecast table not found (HTTP {resp.status_code}, '
-                    f'{len(resp.text)} bytes)'
-                )
+    periods = resp.json()['properties']['periods'][:HOURS_WANTED]
+    if not periods:
+        raise ValueError('No forecast periods returned from API')
 
-            out = {'hour': [], 'direction': [], 'speed': [], 'temp': [], 'precip': []}
+    return {
+        'hour':      [hour_from_iso(p['startTime']) for p in periods],
+        'direction': [p['windDirection'] for p in periods],
+        'speed':     [parse_wind_speed(p['windSpeed']) for p in periods],
+        'temp':      [p['temperature'] for p in periods],
+        'precip':    [p['probabilityOfPrecipitation']['value'] or 0 for p in periods],
+    }
 
-            for line in lines:
-                remaining = HOURS_WANTED - len(out['hour'])
-                if remaining <= 0:
-                    break
-                n = min(remaining, 24)
 
-                hours = extract_row(line, 'Hour', n)
-                if not hours or hours[0] == '--':
-                    continue
-
-                out['hour']     .extend(int(h) for h in hours)
-                out['direction'].extend(extract_row(line, 'Wind Dir',                n))
-                out['speed']    .extend(int(v) for v in extract_row(line, 'Surface Wind',            n))
-                out['temp']     .extend(int(v) for v in extract_row(line, 'Temperature',             n))
-                out['precip']   .extend(int(v) for v in extract_row(line, 'Precipitation Potential', n))
-
-            if not out['hour']:
-                raise ValueError('Regex extracted no data from NWS response')
-
-            return out
-
-        except (requests.RequestException, ValueError) as e:
-            last_err = e
-            continue
-
-    raise last_err
+@app.route('/debug')
+def debug():
+    try:
+        url = get_forecast_hourly_url()
+        resp = requests.get(url, headers=HEADERS, timeout=15)
+        import json
+        snippet = json.dumps(resp.json()['properties']['periods'][:2], indent=2)
+        return f'<pre>Status: {resp.status_code}\nURL: {url}\n\n{snippet}</pre>'
+    except Exception as e:
+        return f'<pre>Error: {e}</pre>', 500
 
 
 @app.route('/')
@@ -95,7 +83,7 @@ def forecast():
         msg = f'Upstream request failed: {e}'
         app.logger.error(msg)
         return jsonify({'error': msg}), 502
-    except (ValueError, re.error) as e:
+    except (ValueError, KeyError) as e:
         msg = f'Parse error: {e}'
         app.logger.error(msg)
         return jsonify({'error': msg}), 502
@@ -103,20 +91,3 @@ def forecast():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
-
-
-@app.route('/debug')
-def debug():
-    try:
-        resp = requests.get(NWS_URL, headers=HEADERS, timeout=20, allow_redirects=True)
-        has_date = '<b>Date' in resp.text
-        snippet = resp.text[:3000].replace('<', '&lt;').replace('>', '&gt;')
-        return (
-            f'<pre>Status: {resp.status_code}\n'
-            f'Final URL: {resp.url}\n'
-            f'Bytes: {len(resp.text)}\n'
-            f'Has b-Date tag: {has_date}\n\n'
-            f'{snippet}</pre>'
-        )
-    except Exception as e:
-        return f'<pre>Error: {e}</pre>', 500
