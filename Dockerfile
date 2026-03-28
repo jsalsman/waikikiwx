@@ -1,4 +1,6 @@
-FROM nginx:alpine
-COPY nginx.conf /etc/nginx/nginx.conf
-COPY index.html /usr/share/nginx/html/index.html
-EXPOSE 8080
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY app.py index.html ./
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"]
