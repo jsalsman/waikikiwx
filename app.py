@@ -1,5 +1,6 @@
+import re
 import requests
-from flask import Flask, send_from_directory, Response
+from flask import Flask, jsonify, send_from_directory
 
 app = Flask(__name__, static_folder='.')
 
@@ -9,25 +10,73 @@ NWS_URL = (
 )
 
 HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 '
-                  '(KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+    'User-Agent': (
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 '
+        '(KHTML, like Gecko) Chrome/124.0 Safari/537.36'
+    ),
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Accept-Language': 'en-US,en;q=0.9',
     'Referer': 'https://www.weather.gov/',
 }
 
+HOURS_WANTED = 48
+
+
+def extract_row(line, label, n):
+    suffix = r'.*?<b>([^<]+)</b>' * n
+    pattern = re.compile(label + suffix, re.DOTALL)
+    m = pattern.search(line)
+    return list(m.groups()) if m else ['--'] * n
+
+
+def scrape_forecast():
+    resp = requests.get(NWS_URL, headers=HEADERS, timeout=15)
+    resp.raise_for_status()
+
+    # The forecast table lives on a single very long line containing "<b>Date"
+    lines = [l for l in resp.text.splitlines() if '<b>Date' in l]
+    if not lines:
+        raise ValueError('Forecast table not found in NWS response')
+
+    out = {'hour': [], 'direction': [], 'speed': [], 'temp': [], 'precip': []}
+
+    for line in lines:
+        remaining = HOURS_WANTED - len(out['hour'])
+        if remaining <= 0:
+            break
+        n = min(remaining, 24)
+
+        hours = extract_row(line, 'Hour', n)
+        if not hours or hours[0] == '--':
+            continue
+
+        out['hour']     .extend(int(h) for h in hours)
+        out['direction'].extend(extract_row(line, 'Wind Dir',                n))
+        out['speed']    .extend(int(v) for v in extract_row(line, 'Surface Wind',            n))
+        out['temp']     .extend(int(v) for v in extract_row(line, 'Temperature',             n))
+        out['precip']   .extend(int(v) for v in extract_row(line, 'Precipitation Potential', n))
+
+    if not out['hour']:
+        raise ValueError('Regex extracted no data from NWS response')
+
+    return out
+
+
 @app.route('/')
 def index():
     return send_from_directory('.', 'index.html')
 
+
 @app.route('/forecast')
 def forecast():
     try:
-        r = requests.get(NWS_URL, headers=HEADERS, timeout=10)
-        r.raise_for_status()
+        data = scrape_forecast()
+        return jsonify(data)
     except requests.RequestException as e:
-        return Response(f'Upstream error: {e}', status=502)
-    return Response(r.text, status=200, mimetype='text/html')
+        return jsonify({'error': f'Upstream request failed: {e}'}), 502
+    except (ValueError, re.error) as e:
+        return jsonify({'error': f'Parse error: {e}'}), 502
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
