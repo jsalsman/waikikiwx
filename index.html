@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Honolulu Weather</title>
+<title>Waikiki Weather</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%23080e1a'/%3E%3Cpath d='M14 42h36M19 32h26M24 22h16' stroke='%2300c8ff' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Bebas+Neue&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -13,7 +15,7 @@
   --hot: #ff6b35;
   --green: #39d98a;
   --warn: #ffcc00;
-  --muted: #4a6a8a;
+  --muted: #9bb7d3;
   --text: #ddeeff;
   --mono: 'DM Mono', monospace;
   --display: 'Bebas Neue', sans-serif;
@@ -39,28 +41,7 @@ html, body {
   height: var(--fh);
   background: var(--bg);
   display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  position: relative;
-}
-
-.status-bar {
-  position: absolute;
-  top: 10%; left: 0; right: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.6em;
-  padding: 0.35em 1em;
-  font-size: var(--fs);
-  letter-spacing: 0.07em;
-  z-index: 50;
-  opacity: 0;
-  transition: opacity 0.4s;
-  pointer-events: none;
-}
-.status-bar.visible { opacity: 1; }
-.status-bar.fetching {
+@@ -64,108 +66,160 @@ html, body {
   background: rgba(0,200,255,0.08);
   border-top: 1px solid rgba(0,200,255,0.2);
   border-bottom: 1px solid rgba(0,200,255,0.2);
@@ -86,9 +67,25 @@ html, body {
   background: var(--panel);
   border-bottom: 1px solid var(--border);
 }
+.site-id { display: flex; align-items: center; gap: 0.7em; }
+.loc-icon {
+  width: 2.8vmin;
+  height: 2.8vmin;
+  min-width: 1.4em;
+  min-height: 1.4em;
+  object-fit: contain;
+}
 .loc { font-family: var(--display); font-size: 3vmin; letter-spacing: 0.1em; color: var(--accent); }
 .coords { font-size: var(--fs); color: var(--muted); margin-top: 0.15em; }
+.now-wrap { display: flex; flex-direction: column; align-items: center; }
 .now-grid { display: flex; gap: 2.2em; }
+.now-summary {
+  margin-top: 0.4em;
+  text-align: center;
+  font-size: calc(var(--fs) * 1.05);
+  color: var(--text);
+  letter-spacing: 0.04em;
+}
 .now-item { text-align: center; }
 .now-lbl { font-size: var(--fs); color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
 .now-val { font-family: var(--display); font-size: 2.8vmin; line-height: 1.1; }
@@ -96,7 +93,7 @@ html, body {
 .c-warn { color: var(--warn); }
 .c-ok   { color: var(--green); }
 .upd { text-align: right; }
-.upd-lbl { font-size: var(--fs); color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.5; }
+.upd-lbl { font-size: var(--fs); color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.9; }
 .upd-val { font-size: var(--fs); color: var(--muted); }
 
 /* ── BODY ── */
@@ -109,6 +106,7 @@ html, body {
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 .block {
   flex: 1;
@@ -120,6 +118,41 @@ html, body {
   border-bottom: 1px solid var(--border);
 }
 .block:last-child { border-bottom: none; }
+.gif-swap-zone { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.goes-overlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 6, 9, 0.95);
+  z-index: 5;
+}
+.goes-overlay.active { display: flex; }
+.goes-wrap {
+  width: 100%;
+  height: 100%;
+  padding: 1.5%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4em;
+}
+.goes-title {
+  font-size: var(--fs);
+  color: var(--text);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.goes-time {
+  color: var(--muted);
+}
+.goes-overlay img {
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  object-fit: contain;
+  border: 1px solid var(--border);
+}
 .blk-lbl {
   flex-shrink: 0;
   display: flex;
@@ -143,7 +176,7 @@ html, body {
   background: var(--accent); opacity: 0.5;
 }
 .blk-date { font-family: var(--display); font-size: 1.6vmin; color: var(--text); letter-spacing: 0.07em; }
-.blk-span { font-size: var(--fs); color: var(--muted); opacity: 0.7; }
+.blk-span { font-size: var(--fs); color: var(--muted); opacity: 0.95; }
 
 table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 table colgroup col.rl { width: 12%; }
@@ -169,28 +202,7 @@ thead tr th { border-top: none; }
   background: rgba(0,200,255,0.09);
   border-left: 1px solid rgba(0,200,255,0.2) !important;
   border-right: 1px solid rgba(0,200,255,0.2) !important;
-}
-.ch { color: var(--hot); }
-.cw { color: var(--warn); }
-.co { color: var(--green); }
-
-/* ── RIGHT: 3 stacked charts ── */
-.charts-col { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
-.chart-panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: 0.75% 1.1% 0.3% 0.9%;
-  border-bottom: 1px solid var(--border);
-  overflow: hidden;
-  min-height: 0;
-}
-.chart-panel:last-child { border-bottom: none; }
-.chart-panel .sec-lbl {
-  font-size: var(--fs);
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.13em;
+@@ -194,94 +248,126 @@ thead tr th { border-top: none; }
   margin-bottom: 0.3em;
   flex-shrink: 0;
   display: flex;
@@ -216,7 +228,7 @@ thead tr th { border-top: none; }
   background: var(--panel);
   border-top: 1px solid var(--border);
 }
-.ftr-src { font-size: var(--fs); color: var(--muted); opacity: 0.35; letter-spacing: 0.05em; }
+.ftr-src { font-size: var(--fs); color: var(--muted); opacity: 0.82; letter-spacing: 0.05em; }
 .ftr-next { font-size: var(--fs); color: var(--muted); display: flex; align-items: center; gap: 0.5em; }
 .pulse {
   width: 0.5vmin; height: 0.5vmin; border-radius: 50%;
@@ -224,6 +236,32 @@ thead tr th { border-top: none; }
   animation: pulse 2s ease-in-out infinite;
 }
 @keyframes pulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:0.2;transform:scale(0.6);} }
+
+@media (max-width: 900px) and (orientation: portrait) {
+  html, body { overflow: auto; display: block; }
+  .frame {
+    width: 100vw;
+    height: auto;
+    min-height: 100vh;
+    --fw: 100vw;
+    --fh: auto;
+  }
+  .body {
+    flex-direction: column;
+    overflow: visible;
+  }
+  .charts-col { order: 1; }
+  .tbl-col {
+    order: 2;
+    width: 100%;
+    border-right: none;
+    border-top: 1px solid var(--border);
+  }
+  .chart-panel, .block { min-height: 22vh; }
+  .ftr { min-height: 3.4em; }
+  .site-id { margin-bottom: 0.2em; }
+  .now-summary { margin-bottom: 0.2em; }
+}
 </style>
 </head>
 <body>
@@ -236,30 +274,36 @@ thead tr th { border-top: none; }
 
   <div class="hdr">
     <div>
-      <div class="loc">HONOLULU · NORTH WAIKIKI</div>
+      <div class="site-id">
+        <img class="loc-icon" id="loc-icon" alt="Current weather icon">
+        <div class="loc">WAIKIKI</div>
+      </div>
       <div class="coords">21.31°N 157.86°W · ELEV 59ft</div>
     </div>
-    <div class="now-grid">
-      <div class="now-item">
-        <div class="now-lbl">Hour</div>
-        <div class="now-val" id="now-hour">—<span style="font-size:0.45em;color:var(--muted)">HST</span></div>
+    <div class="now-wrap">
+      <div class="now-grid">
+        <div class="now-item">
+          <div class="now-lbl">Hour</div>
+          <div class="now-val" id="now-hour">—<span style="font-size:0.45em;color:var(--muted)">HST</span></div>
+        </div>
+        <div class="now-item">
+          <div class="now-lbl">Wind Dir</div>
+          <div class="now-val" id="now-dir">—</div>
+        </div>
+        <div class="now-item">
+          <div class="now-lbl">Wind mph</div>
+          <div class="now-val" id="now-wind">—</div>
+        </div>
+        <div class="now-item">
+          <div class="now-lbl">Temp °F</div>
+          <div class="now-val" id="now-temp">—</div>
+        </div>
+        <div class="now-item">
+          <div class="now-lbl">Precip %</div>
+          <div class="now-val" id="now-precip">—</div>
+        </div>
       </div>
-      <div class="now-item">
-        <div class="now-lbl">Wind Dir</div>
-        <div class="now-val" id="now-dir">—</div>
-      </div>
-      <div class="now-item">
-        <div class="now-lbl">Wind mph</div>
-        <div class="now-val" id="now-wind">—</div>
-      </div>
-      <div class="now-item">
-        <div class="now-lbl">Temp °F</div>
-        <div class="now-val" id="now-temp">—</div>
-      </div>
-      <div class="now-item">
-        <div class="now-lbl">Precip %</div>
-        <div class="now-val" id="now-precip">—</div>
-      </div>
+      <div class="now-summary" id="now-summary">—</div>
     </div>
     <div class="upd">
       <div class="upd-lbl">Last updated</div>
@@ -285,76 +329,7 @@ thead tr th { border-top: none; }
     </div>
   </div>
 
-  <div class="ftr">
-    <div class="ftr-src">NOAA / NWS HONOLULU · forecast.weather.gov · 21.31°N 157.86°W</div>
-    <div class="ftr-next">
-      <div class="pulse"></div>
-      NEXT UPDATE <span id="cd">10:00</span>
-    </div>
-  </div>
-
-</div>
-<script>
-'use strict';
-
-// ── CONFIG ────────────────────────────────────────────────────
-// Flask serves /forecast as JSON — same origin, no CORS needed.
-const UPDATE_INTERVAL_MS = 10 * 60 * 1000;
-
-// ── STATUS BAR ───────────────────────────────────────────────
-const statusBar  = document.getElementById('status-bar');
-const statusIcon = document.getElementById('status-icon');
-const statusMsg  = document.getElementById('status-msg');
-let   statusTimer = null;
-
-function showStatus(type, msg, autohideMs = 0) {
-  clearTimeout(statusTimer);
-  statusBar.className    = `status-bar visible ${type}`;
-  statusIcon.textContent = type === 'fetching' ? '↻' : '⚠';
-  statusIcon.className   = type === 'fetching' ? 'spin' : '';
-  statusMsg.textContent  = msg;
-  if (autohideMs) {
-    statusTimer = setTimeout(() => { statusBar.className = 'status-bar'; }, autohideMs);
-  }
-}
-function hideStatus() {
-  clearTimeout(statusTimer);
-  statusBar.className = 'status-bar';
-}
-
-// ── FETCH ─────────────────────────────────────────────────────
-async function fetchWeatherData() {
-  const response = await fetch('/forecast');
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const data = await response.json();
-  if (data.error) throw new Error(data.error);
-  if (!data.hour || !data.hour.length) throw new Error('Empty forecast data');
-  return data;
-}
-
-// ── TABLE RENDERING ───────────────────────────────────────────
-const DAYS   = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
-const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-
-function fmtDate(d) {
-  return `${DAYS[d.getDay()]} ${MONTHS[d.getMonth()]} ${d.getDate()}`;
-}
-function fmtHour(h) {
-  if (h === 0)  return '12AM';
-  if (h < 12)   return h + 'AM';
-  if (h === 12) return '12PM';
-  return (h - 12) + 'PM';
-}
-
-function makeBlock(slice, label, span, nowIdx) {
-  const block = document.createElement('div');
-  block.className = 'block';
-  block.innerHTML = `
-    <div class="blk-lbl">
-      <div class="blk-tag">Forecast</div>
-      <div class="blk-date">${label}</div>
-      <div class="blk-span">${span}</div>
-    </div>`;
+@@ -358,111 +444,162 @@ function makeBlock(slice, label, span, nowIdx) {
 
   const table = document.createElement('table');
   const cg    = document.createElement('colgroup');
@@ -380,10 +355,10 @@ function makeBlock(slice, label, span, nowIdx) {
 
   const tbody = document.createElement('tbody');
   [
-    { label: 'Dir',    key: 'direction' },
-    { label: 'Wind',   key: 'speed'     },
     { label: 'Temp',   key: 'temp'      },
     { label: 'Precip', key: 'precip'    },
+    { label: 'Wind',   key: 'speed'     },
+    { label: 'Dir',    key: 'direction' },
   ].forEach(({ label: rl, key }) => {
     const tr   = document.createElement('tr');
     const tdRl = document.createElement('td');
@@ -420,6 +395,9 @@ function renderTables(data) {
   let cursor = new Date(hstNow);
   cursor.setHours(data.hour[0], 0, 0, 0);
 
+  const lowerZone = document.createElement('div');
+  lowerZone.className = 'gif-swap-zone';
+
   for (let s = 0; s < numSlices; s++) {
     const start = s * sliceLen;
     const slice = {
@@ -438,8 +416,56 @@ function renderTables(data) {
       ? `${fmtHour(slice.hour[0])} – ${DAYS[endCursor.getDay()]} ${fmtHour(slice.hour[sliceLen - 1])}`
       : `${fmtHour(slice.hour[0])} – ${fmtHour(slice.hour[sliceLen - 1])}`;
 
-    col.appendChild(makeBlock(slice, fmtDate(startDate), span, s === 0 ? 0 : -1));
+    const block = makeBlock(slice, fmtDate(startDate), span, s === 0 ? 0 : -1);
+    if (s < 2) col.appendChild(block);
+    else lowerZone.appendChild(block);
     cursor.setHours(cursor.getHours() + sliceLen);
+  }
+
+  col.appendChild(lowerZone);
+  attachGoesOverlay(lowerZone);
+}
+
+let goesOverlayTimer = null;
+
+function attachGoesOverlay(parent) {
+  const overlay = document.createElement('div');
+  overlay.className = 'goes-overlay';
+  overlay.innerHTML = `
+    <div class="goes-wrap">
+      <div class="goes-title">GOES West Hawaii Air Mass <span class="goes-time" id="goes-time">loading…</span></div>
+      <img id="goes-img" alt="Latest GOES West Hawaii Air Mass animation">
+    </div>`;
+  parent.appendChild(overlay);
+  refreshGoesImage();
+  clearInterval(goesOverlayTimer);
+  let showOverlay = true;
+  overlay.classList.add('active');
+  goesOverlayTimer = setInterval(() => {
+    showOverlay = !showOverlay;
+    overlay.classList.toggle('active', showOverlay);
+  }, 10000);
+}
+
+async function fetchGoesAirmassUrl() {
+  const response = await fetch('/goes-airmass');
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const data = await response.json();
+  if (data.error || !data.url) throw new Error(data.error || 'Missing GOES URL');
+  return data.url;
+}
+
+async function refreshGoesImage() {
+  const goesImg = document.getElementById('goes-img');
+  const goesTime = document.getElementById('goes-time');
+  if (!goesImg || !goesTime) return;
+  try {
+    const url = await fetchGoesAirmassUrl();
+    goesImg.src = `${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}`;
+    goesTime.textContent = `· ${new Date().toLocaleTimeString('en-US', { timeZone: 'Pacific/Honolulu', hour: 'numeric', minute: '2-digit' })} HST`;
+  } catch (err) {
+    console.error('[goes] fetch failed:', err);
+    goesTime.textContent = '· unavailable';
   }
 }
 
@@ -466,44 +492,7 @@ function drawChart(id, W, H, data, mn, mx, opts = {}) {
   const PL = 28, PR = 8, PT = 8, PB = 16;
   const cW = W - PL - PR;
   const cH = H - PT - PB;
-  const xp = i => PL + (i / (N - 1)) * cW;
-  const yp = v => PT + (1 - (v - mn) / (mx - mn)) * cH;
-
-  // horizontal grid
-  for (let s = 0; s <= 4; s++) {
-    const v = mn + (mx - mn) * s / 4, y = yp(v);
-    svg.appendChild(svgEl('line', { x1:PL, y1:y, x2:W-PR, y2:y, stroke:'#1a2d48', 'stroke-width':0.4 }));
-    svgTxt(svg, Math.round(v), PL - 3, y + 3, 7, '#4a6a8a', 'end');
-  }
-
-  // vertical ticks + 12h block dividers
-  const xLabels = opts.xLabels || [];
-  for (let i = 0; i < N; i++) {
-    if (i % 3 !== 0) continue;
-    const x     = xp(i);
-    const isDiv = i > 0 && i % 12 === 0;
-    svg.appendChild(svgEl('line', {
-      x1:x, y1:PT, x2:x, y2:H-PB,
-      stroke: isDiv ? '#2a4565' : '#1a2d48',
-      'stroke-width': isDiv ? 0.8 : (i % 6 === 0 ? 0.5 : 0.2),
-      ...(isDiv ? { 'stroke-dasharray': '2,2' } : {}),
-    }));
-    if (i % 6 === 0 && xLabels[i]) {
-      svgTxt(svg, xLabels[i], x, H - PB + 9, 7, '#4a6a8a', 'middle');
-    }
-  }
-
-  // now-line
-  svg.appendChild(svgEl('line', {
-    x1:xp(0), y1:PT, x2:xp(0), y2:H-PB,
-    stroke:'#00c8ff', 'stroke-width':0.9, 'stroke-dasharray':'3,2', opacity:0.6,
-  }));
-
-  // warning threshold
-  if (opts.warnAt != null) {
-    const yw = yp(opts.warnAt);
-    svg.appendChild(svgEl('line', { x1:PL, y1:yw, x2:W-PR, y2:yw,
-      stroke:'#ffcc00', 'stroke-width':0.55, 'stroke-dasharray':'3,3', opacity:0.45 }));
+@@ -507,87 +644,104 @@ function drawChart(id, W, H, data, mn, mx, opts = {}) {
   }
 
   if (opts.bars) {
@@ -529,15 +518,30 @@ function drawChart(id, W, H, data, mn, mx, opts = {}) {
 
 // ── RENDER ALL ────────────────────────────────────────────────
 function renderAll(data) {
+  const nowIcon = (data.icon && data.icon[0]) || '';
+  const shortForecast = (data.short && data.short[0]) || '';
+
   document.getElementById('now-hour').childNodes[0].textContent = data.hour[0];
   document.getElementById('now-dir')   .textContent = data.direction[0];
   document.getElementById('now-wind')  .textContent = data.speed[0];
   document.getElementById('now-temp')  .textContent = data.temp[0];
   document.getElementById('now-precip').textContent = data.precip[0];
+  document.getElementById('now-summary').textContent = shortForecast || '—';
 
   document.getElementById('now-wind')  .className = 'now-val' + (data.speed[0]  > 35  ? ' c-warn' : '');
   document.getElementById('now-temp')  .className = 'now-val' + (data.temp[0]   >= 75 ? ' c-hot'  : '');
   document.getElementById('now-precip').className = 'now-val' + (data.precip[0] > 50  ? ' c-warn' : ' c-ok');
+
+  if (nowIcon) {
+    const iconWithCacheBust = `${nowIcon}${nowIcon.includes('?') ? '&' : '?'}t=${Date.now()}`;
+    const locIconEl = document.getElementById('loc-icon');
+    const faviconEl = document.querySelector('link[rel="icon"]');
+    locIconEl.src = iconWithCacheBust;
+    if (faviconEl) {
+      faviconEl.href = iconWithCacheBust;
+      faviconEl.type = 'image/png';
+    }
+  }
 
   document.getElementById('upd-time').textContent = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Pacific/Honolulu',
@@ -586,6 +590,8 @@ setInterval(() => {
   secsLeft = UPDATE_INTERVAL_MS / 1000;
   update();
 }, UPDATE_INTERVAL_MS);
+
+setInterval(refreshGoesImage, 10 * 60 * 1000);
 
 update();
 </script>
