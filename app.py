@@ -6,6 +6,7 @@ app = Flask(__name__, static_folder='.')
 
 LAT = 21.3069
 LON = -157.8583
+
 POINTS_URL = f'https://api.weather.gov/points/{LAT},{LON}'
 HOURS_WANTED = 48
 GOES_SECTOR_URL = 'https://www.star.nesdis.noaa.gov/goes/sector.php?sat=G18&sector=hi'
