@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Honolulu Weather</title>
+<title>Waikiki Weather</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Bebas+Neue&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -127,7 +127,7 @@ html, body {
   margin-bottom: 0.3em;
 }
 .blk-tag {
-  font-size: 0.62vmin;
+  font-size: 0.78vmin;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.13em;
@@ -141,8 +141,8 @@ html, body {
   width: 1em; height: 1px;
   background: var(--accent); opacity: 0.5;
 }
-.blk-date { font-family: var(--display); font-size: 1.25vmin; color: var(--text); letter-spacing: 0.07em; }
-.blk-span { font-size: 0.62vmin; color: var(--muted); opacity: 0.7; }
+.blk-date { font-family: var(--display); font-size: 1.5vmin; color: var(--text); letter-spacing: 0.07em; }
+.blk-span { font-size: 0.78vmin; color: var(--muted); opacity: 0.7; }
 
 table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 table colgroup col.rl { width: 12%; }
@@ -152,13 +152,13 @@ th, td {
   white-space: nowrap;
   overflow: hidden;
   padding: 0.2em 0.35em 0.2em 0;
-  font-size: 0.9vmin;
+  font-size: 1.1vmin;
 }
-th { color: var(--muted); font-weight: 400; font-size: 0.78vmin; }
+th { color: var(--muted); font-weight: 400; font-size: 0.95vmin; }
 th.rl, td.rl {
   text-align: left;
   color: var(--muted);
-  font-size: 0.76vmin;
+  font-size: 0.92vmin;
   font-weight: 500;
   padding-left: 0;
 }
@@ -186,7 +186,7 @@ thead tr th { border-top: none; }
 }
 .chart-panel:last-child { border-bottom: none; }
 .chart-panel .sec-lbl {
-  font-size: 0.68vmin;
+  font-size: 0.88vmin;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.13em;
@@ -472,7 +472,7 @@ function drawChart(id, W, H, data, mn, mx, opts = {}) {
   for (let s = 0; s <= 4; s++) {
     const v = mn + (mx - mn) * s / 4, y = yp(v);
     svg.appendChild(svgEl('line', { x1:PL, y1:y, x2:W-PR, y2:y, stroke:'#1a2d48', 'stroke-width':0.4 }));
-    svgTxt(svg, Math.round(v), PL - 3, y + 3, 6, '#4a6a8a', 'end');
+    svgTxt(svg, Math.round(v), PL - 3, y + 3, 8, '#4a6a8a', 'end');
   }
 
   // vertical ticks + 12h block dividers
@@ -488,7 +488,7 @@ function drawChart(id, W, H, data, mn, mx, opts = {}) {
       ...(isDiv ? { 'stroke-dasharray': '2,2' } : {}),
     }));
     if (i % 6 === 0 && xLabels[i]) {
-      svgTxt(svg, xLabels[i], x, H - PB + 9, 6, '#4a6a8a', 'middle');
+      svgTxt(svg, xLabels[i], x, H - PB + 9, 8, '#4a6a8a', 'middle');
     }
   }
 
