@@ -1,2 +1,2 @@
 # waikikiwx
-Single page fetch() application for North Waikiki 48 hour weather forecast
+Single page live 48 hour weather forecast for North Waikiki, Honolulu, Oahu, Hawaii.
