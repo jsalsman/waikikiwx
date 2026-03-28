@@ -103,3 +103,20 @@ def forecast():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
+
+
+@app.route('/debug')
+def debug():
+    try:
+        resp = requests.get(NWS_URL, headers=HEADERS, timeout=20, allow_redirects=True)
+        has_date = '<b>Date' in resp.text
+        snippet = resp.text[:3000].replace('<', '&lt;').replace('>', '&gt;')
+        return (
+            f'<pre>Status: {resp.status_code}\n'
+            f'Final URL: {resp.url}\n'
+            f'Bytes: {len(resp.text)}\n'
+            f'Has b-Date tag: {has_date}\n\n'
+            f'{snippet}</pre>'
+        )
+    except Exception as e:
+        return f'<pre>Error: {e}</pre>', 500
