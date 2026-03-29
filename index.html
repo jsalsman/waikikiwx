@@ -120,7 +120,7 @@ html, body {
 /* BODY */
 .body { flex: 1; display: flex; min-height: 0; overflow: hidden; }
 .charts-col {
-  width: calc(100% * 4 / 7);
+  width: 50%;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -149,7 +149,7 @@ html, body {
 /* ── LEFT: 4 stacked 12-hour tables ── */
 .tbl-col {
   flex-shrink: 0;
-  width: calc(100% * 3 / 7);
+  width: 50%;
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -361,15 +361,15 @@ thead tr th { border-top: none; }
     <div class="charts-col">
       <div class="chart-panel">
         <div class="sec-lbl">Temperature (°F)</div>
-        <svg id="cTemp" viewBox="0 0 260 78" preserveAspectRatio="none"></svg>
+        <svg id="cTemp" style="width:100%; height:100%;"></svg>
       </div>
       <div class="chart-panel">
         <div class="sec-lbl">Precipitation (%)</div>
-        <svg id="cPrecip" viewBox="0 0 260 78" preserveAspectRatio="none"></svg>
+        <svg id="cPrecip" style="width:100%; height:100%;"></svg>
       </div>
       <div class="chart-panel">
         <div class="sec-lbl">Wind Speed (mph)</div>
-        <svg id="cWind" viewBox="0 0 260 78" preserveAspectRatio="none"></svg>
+        <svg id="cWind" style="width:100%; height:100%;"></svg>
       </div>
     </div>
   </div>
@@ -600,48 +600,117 @@ function svgTxt(parent, text, x, y, size, fill, anchor) {
   parent.appendChild(t);
 }
 
-function drawChart(id, W, H, data, mn, mx, opts = {}) {
+function drawChart(id, W, H, data, defaultMn, defaultMx, opts = {}) {
   const svg = document.getElementById(id);
   svg.innerHTML = '';
-  const N  = data.length;
-  const PL = 36, PR = 8, PT = 12, PB = 16;
+  // Use actual container dimensions if W/H not accurate
+  const rect = svg.parentElement.getBoundingClientRect();
+  W = rect.width;
+  // Subtracting header height roughly
+  H = rect.height - 24;
+  if (W === 0 || H <= 0) {
+    W = svg.clientWidth || 300;
+    H = svg.clientHeight || 100;
+  }
+
+  // Create an internal viewBox so resizing works fluidly
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+
+  const N = data.length;
+  // Professional padding
+  const PL = 36, PR = 16, PT = 16, PB = 20;
   const cW = W - PL - PR;
   const cH = H - PT - PB;
 
-  const xp = i => PL + i * (cW / (N - 1));
-  const yp = v => PT + cH - ((v - mn) / (mx - mn)) * cH;
+  // Calculate dynamic ticks
+  let min = Math.min(...data, defaultMn);
+  let max = Math.max(...data, defaultMx);
+  if (min === max) { min -= 1; max += 1; }
 
+  // Custom domains for specific charts for better aesthetics
+  if (id === 'cPrecip') {
+      min = 0;
+      max = Math.max(100, max);
+  } else if (id === 'cWind') {
+      min = 0;
+      max = Math.max(40, max);
+  }
+
+  const range = max - min;
+  let roughStep = range / 3; // Target ~4 ticks
+  if (id === 'cPrecip') roughStep = 25; // Force 0, 25, 50, 75, 100
+
+  const mag = Math.pow(10, Math.floor(Math.log10(roughStep || 1)));
+  const norm = roughStep / mag;
+  let step = norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10;
+  step *= mag;
+
+  if (id === 'cPrecip') step = 25; // Lock it in
+
+  const minTick = Math.floor(min / step) * step;
+  const maxTick = Math.ceil(max / step) * step;
+
+  const ticks = [];
+  for (let t = minTick; t <= maxTick + 1e-9; t += step) {
+    ticks.push(t);
+  }
+
+  // Update effective min/max for scaling
+  const graphMin = minTick;
+  const graphMax = maxTick;
+
+  const xp = i => PL + i * (cW / (N - 1));
+  // Provide a safe division in case maxTick == minTick
+  const denom = (graphMax - graphMin) || 1;
+  const yp = v => PT + cH - ((v - graphMin) / denom) * cH;
+
+  // Draw Grid lines and Y-axis labels
+  ticks.forEach(tick => {
+    const y = yp(tick);
+    // Grid line
+    svg.appendChild(svgEl('line', {
+      x1: PL, y1: y, x2: W - PR, y2: y,
+      stroke: 'rgba(255,255,255,0.08)', 'stroke-width': 1
+    }));
+    // Label
+    svgTxt(svg, tick, PL - 8, y + 4, 11, '#9bb7d3', 'end');
+  });
+
+  // Draw X-axis labels
   if (opts.xLabels) {
+    // Determine a safe step for X labels to avoid overlap
+    const labelWidthEstimate = 20;
+    const maxLabels = Math.floor(cW / labelWidthEstimate);
+    const xStep = Math.ceil(N / maxLabels);
+
     opts.xLabels.forEach((lbl, i) => {
-      if (lbl) {
-        svgTxt(svg, lbl, xp(i), H - 2, 8, '#9bb7d3');
+      if (lbl && (i % xStep === 0 || i === N - 1)) {
+        svgTxt(svg, lbl, xp(i), H - 4, 10, '#9bb7d3');
       }
     });
   }
 
-  // Draw Y-axis labels
-  const yFormat = opts.yFormat || (v => v);
-  svgTxt(svg, yFormat(mx), PL - 6, PT + 4, 10, '#9bb7d3', 'end');
-  svgTxt(svg, yFormat(mn), PL - 6, PT + cH, 10, '#9bb7d3', 'end');
-
+  // Draw Data
   if (opts.bars) {
-    const bW = cW / N * 0.55;
+    const bW = (cW / N) * 0.7;
     data.forEach((v, i) => {
-      const x = xp(i) - bW / 2, y = yp(v), bh = (H - PB) - y;
+      const x = xp(i) - bW / 2;
+      const y = yp(v);
+      const bh = (PT + cH) - y;
       if (bh <= 0) return;
       const fill = v >= 50 ? '#ff4444' : v >= 30 ? '#ffcc00' : '#00c8ff';
-      svg.appendChild(svgEl('rect', { x, y, width:bW, height:bh, fill, rx:0.8, opacity:0.72 }));
+      svg.appendChild(svgEl('rect', { x, y, width: bW, height: bh, fill, rx: 1, opacity: 0.85 }));
     });
-    const y50 = yp(50);
-    svg.appendChild(svgEl('line', { x1:PL, y1:y50, x2:W-PR, y2:y50,
-      stroke:'#ff4444', 'stroke-width':0.55, 'stroke-dasharray':'3,3', opacity:0.4 }));
   } else {
     const lineD = data.map((v, i) =>
       `${i === 0 ? 'M' : 'L'}${xp(i).toFixed(1)},${yp(v).toFixed(1)}`).join(' ');
-    const areaD = lineD + ` L${xp(N-1).toFixed(1)},${H-PB} L${xp(0).toFixed(1)},${H-PB} Z`;
-    svg.appendChild(svgEl('path', { d:areaD, fill:opts.areaColor || 'rgba(0,200,255,0.07)', stroke:'none' }));
-    svg.appendChild(svgEl('path', { d:lineD, fill:'none', stroke:opts.lineColor || '#00c8ff',
-      'stroke-width':1.5, 'stroke-linejoin':'round', 'stroke-linecap':'round' }));
+    const areaD = lineD + ` L${xp(N-1).toFixed(1)},${PT + cH} L${xp(0).toFixed(1)},${PT + cH} Z`;
+
+    // Solid fill with opacity
+    svg.appendChild(svgEl('path', { d: areaD, fill: opts.areaColor || 'rgba(0,200,255,0.1)', stroke: 'none' }));
+    svg.appendChild(svgEl('path', { d: lineD, fill: 'none', stroke: opts.lineColor || '#00c8ff',
+      'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
   }
 }
 
