@@ -41,6 +41,10 @@ html, body {
   height: var(--fh);
   background: var(--bg);
   display: flex;
+  flex-direction: column;
+}
+.status-bar {
+  display: flex;
   background: rgba(0,200,255,0.08);
   border-top: 1px solid rgba(0,200,255,0.2);
   border-bottom: 1px solid rgba(0,200,255,0.2);
@@ -96,7 +100,7 @@ html, body {
 .upd-val { font-size: var(--fs); color: var(--muted); }
 
 /* ── BODY ── */
-.body { flex: 1; display: flex; min-height: 0; overflow: hidden; }
+.body { flex: 1; display: flex; flex-direction: row; min-height: 0; overflow: hidden; }
 
 /* ── LEFT: 4 stacked 12-hour tables ── */
 .tbl-col {
@@ -106,6 +110,12 @@ html, body {
   display: flex;
   flex-direction: column;
   position: relative;
+}
+.charts-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .block {
   flex: 1;
@@ -314,15 +324,15 @@ thead tr th { border-top: none; }
     <div class="charts-col">
       <div class="chart-panel">
         <div class="sec-lbl">Temperature (°F)</div>
-        <svg id="cTemp" viewBox="0 0 260 78" preserveAspectRatio="none"></svg>
+        <svg id="cTemp"></svg>
       </div>
       <div class="chart-panel">
         <div class="sec-lbl">Precipitation (%)</div>
-        <svg id="cPrecip" viewBox="0 0 260 78" preserveAspectRatio="none"></svg>
+        <svg id="cPrecip"></svg>
       </div>
       <div class="chart-panel">
         <div class="sec-lbl">Wind Speed (mph)</div>
-        <svg id="cWind" viewBox="0 0 260 78" preserveAspectRatio="none"></svg>
+        <svg id="cWind"></svg>
       </div>
     </div>
   </div>
@@ -558,7 +568,22 @@ function drawChart(id, W, H, data, mn, mx, opts = {}) {
   const PL = 28, PR = 8, PT = 8, PB = 16;
   const cW = W - PL - PR;
   const cH = H - PT - PB;
+
+  const xp = i => PL + i * (cW / (N - 1));
+  const yp = v => PT + cH - ((v - mn) / (mx - mn)) * cH;
+
+  if (opts.xLabels) {
+    opts.xLabels.forEach((lbl, i) => {
+      if (lbl) {
+        svgTxt(svg, lbl, xp(i), H - 2, 8, '#9bb7d3');
+      }
+    });
   }
+
+  // Draw Y-axis labels
+  const yFormat = opts.yFormat || (v => v);
+  svgTxt(svg, yFormat(mx), PL - 4, PT + 6, 8, '#9bb7d3', 'end');
+  svgTxt(svg, yFormat(mn), PL - 4, PT + cH + 3, 8, '#9bb7d3', 'end');
 
   if (opts.bars) {
     const bW = cW / N * 0.55;
@@ -616,15 +641,33 @@ function renderAll(data) {
 
   renderTables(data);
 
-  const xLabels = data.hour.map(h =>
-    h === 0 ? '12A' : h < 12 ? h + 'A' : h === 12 ? '12P' : (h - 12) + 'P'
+  const xLabels = data.hour.map((h, i) =>
+    (i % 6 === 0) ? (h === 0 ? '12A' : h < 12 ? h + 'A' : h === 12 ? '12P' : (h - 12) + 'P') : ''
   );
-  drawChart('cTemp',   260, 78, data.temp,   55, 85,
-    { lineColor:'#ff6b35', areaColor:'rgba(255,107,53,0.08)', xLabels });
-  drawChart('cPrecip', 260, 78, data.precip,  0, 100,
-    { bars:true, xLabels });
-  drawChart('cWind',   260, 78, data.speed,   0,  40,
-    { lineColor:'#39d98a', areaColor:'rgba(57,217,138,0.07)', warnAt:35, xLabels });
+
+  const chartPanels = document.querySelectorAll('.chart-panel');
+  // ensure there's a fallback if not attached or rendered correctly yet
+  let cW = chartPanels[0].clientWidth;
+  let cH = chartPanels[0].clientHeight;
+  if (cW === 0) cW = document.querySelector('.charts-col').clientWidth;
+  if (cW === 0) cW = window.innerWidth * (4 / 7); // approx fallback
+  if (cH === 0) cH = 78;
+
+  // Set the viewbox properly so aspect ratio isn't mangled, but fills the space
+  ['cTemp', 'cPrecip', 'cWind'].forEach(id => {
+    const el = document.getElementById(id);
+    el.setAttribute('viewBox', `0 0 ${cW} ${cH}`);
+    el.style.width = '100%';
+    el.style.height = '100%';
+    el.removeAttribute('preserveAspectRatio');
+  });
+
+  drawChart('cTemp',   cW, cH, data.temp,   55, 85,
+    { lineColor:'#ff6b35', areaColor:'rgba(255,107,53,0.08)', xLabels, yFormat: v => v + '°' });
+  drawChart('cPrecip', cW, cH, data.precip,  0, 100,
+    { bars:true, xLabels, yFormat: v => v + '%' });
+  drawChart('cWind',   cW, cH, data.speed,   0,  40,
+    { lineColor:'#39d98a', areaColor:'rgba(57,217,138,0.07)', warnAt:35, xLabels, yFormat: v => v });
 }
 
 // ── UPDATE LOOP ───────────────────────────────────────────────
