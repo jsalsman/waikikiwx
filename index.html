@@ -41,7 +41,6 @@ html, body {
   height: var(--fh);
   background: var(--bg);
   display: flex;
-@@ -64,108 +66,160 @@ html, body {
   background: rgba(0,200,255,0.08);
   border-top: 1px solid rgba(0,200,255,0.2);
   border-bottom: 1px solid rgba(0,200,255,0.2);
@@ -202,7 +201,6 @@ thead tr th { border-top: none; }
   background: rgba(0,200,255,0.09);
   border-left: 1px solid rgba(0,200,255,0.2) !important;
   border-right: 1px solid rgba(0,200,255,0.2) !important;
-@@ -194,94 +248,126 @@ thead tr th { border-top: none; }
   margin-bottom: 0.3em;
   flex-shrink: 0;
   display: flex;
@@ -329,8 +327,76 @@ thead tr th { border-top: none; }
     </div>
   </div>
 
-@@ -358,111 +444,162 @@ function makeBlock(slice, label, span, nowIdx) {
+  <div class="ftr">
+    <div class="ftr-src">NOAA / NWS HONOLULU · forecast.weather.gov · 21.31°N 157.86°W</div>
+    <div class="ftr-next">
+      <div class="pulse"></div>
+      NEXT UPDATE <span id="cd">10:00</span>
+    </div>
+  </div>
 
+</div>
+<script>
+'use strict';
+
+// ── CONFIG ────────────────────────────────────────────────────
+// Flask serves /forecast as JSON — same origin, no CORS needed.
+const UPDATE_INTERVAL_MS = 10 * 60 * 1000;
+
+// ── STATUS BAR ───────────────────────────────────────────────
+const statusBar  = document.getElementById('status-bar');
+const statusIcon = document.getElementById('status-icon');
+const statusMsg  = document.getElementById('status-msg');
+let   statusTimer = null;
+
+function showStatus(type, msg, autohideMs = 0) {
+  clearTimeout(statusTimer);
+  statusBar.className    = `status-bar visible ${type}`;
+  statusIcon.textContent = type === 'fetching' ? '↻' : '⚠';
+  statusIcon.className   = type === 'fetching' ? 'spin' : '';
+  statusMsg.textContent  = msg;
+  if (autohideMs) {
+    statusTimer = setTimeout(() => { statusBar.className = 'status-bar'; }, autohideMs);
+  }
+}
+function hideStatus() {
+  clearTimeout(statusTimer);
+  statusBar.className = 'status-bar';
+}
+
+// ── FETCH ─────────────────────────────────────────────────────
+async function fetchWeatherData() {
+  const response = await fetch('/forecast');
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const data = await response.json();
+  if (data.error) throw new Error(data.error);
+  if (!data.hour || !data.hour.length) throw new Error('Empty forecast data');
+  return data;
+}
+
+// ── TABLE RENDERING ───────────────────────────────────────────
+const DAYS   = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+
+function fmtDate(d) {
+  return `${DAYS[d.getDay()]} ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+}
+function fmtHour(h) {
+  if (h === 0)  return '12AM';
+  if (h < 12)   return h + 'AM';
+  if (h === 12) return '12PM';
+  return (h - 12) + 'PM';
+}
+
+function makeBlock(slice, label, span, nowIdx) {
+  const block = document.createElement('div');
+  block.className = 'block';
+  block.innerHTML = `
+    <div class="blk-lbl">
+      <div class="blk-tag">Forecast</div>
+      <div class="blk-date">${label}</div>
+      <div class="blk-span">${span}</div>
+    </div>`;
   const table = document.createElement('table');
   const cg    = document.createElement('colgroup');
   const rlCol = document.createElement('col');
@@ -492,7 +558,6 @@ function drawChart(id, W, H, data, mn, mx, opts = {}) {
   const PL = 28, PR = 8, PT = 8, PB = 16;
   const cW = W - PL - PR;
   const cH = H - PT - PB;
-@@ -507,87 +644,104 @@ function drawChart(id, W, H, data, mn, mx, opts = {}) {
   }
 
   if (opts.bars) {
