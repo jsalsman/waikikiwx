@@ -115,19 +115,18 @@ html, body {
   overflow: hidden;
   min-height: 0;
   border-bottom: 1px solid var(--border);
+  position: relative;
+  z-index: 1;
 }
 .block:last-child { border-bottom: none; }
-.gif-swap-zone { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.gif-swap-zone { position: relative; display: flex; flex-direction: column; flex: 3; min-height: 0; }
 .goes-overlay {
-  position: absolute;
-  inset: 0;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  background: rgba(2, 6, 9, 0.95);
-  z-index: 5;
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  object-fit: cover; z-index: 0; opacity: 0; transition: opacity 0.5s;
+  pointer-events: none;
 }
-.goes-overlay.active { display: flex; }
+.gif-swap-zone.show-gif .goes-overlay { opacity: 0.3; }
+.gif-swap-zone.show-gif .block { background: transparent !important; }
 .goes-wrap {
   width: 100%;
   height: 100%;
@@ -339,6 +338,8 @@ thead tr th { border-top: none; }
 <script>
 'use strict';
 
+const initialData = {{ data | tojson | safe if data else 'null' }};
+
 // ── CONFIG ────────────────────────────────────────────────────
 // Flask serves /forecast as JSON — same origin, no CORS needed.
 const UPDATE_INTERVAL_MS = 10 * 60 * 1000;
@@ -483,7 +484,7 @@ function renderTables(data) {
       : `${fmtHour(slice.hour[0])} – ${fmtHour(slice.hour[sliceLen - 1])}`;
 
     const block = makeBlock(slice, fmtDate(startDate), span, s === 0 ? 0 : -1);
-    if (s < 2) col.appendChild(block);
+    if (s < 1) col.appendChild(block);
     else lowerZone.appendChild(block);
     cursor.setHours(cursor.getHours() + sliceLen);
   }
@@ -506,10 +507,10 @@ function attachGoesOverlay(parent) {
   refreshGoesImage();
   clearInterval(goesOverlayTimer);
   let showOverlay = true;
-  overlay.classList.add('active');
+  parent.classList.add('show-gif');
   goesOverlayTimer = setInterval(() => {
     showOverlay = !showOverlay;
-    overlay.classList.toggle('active', showOverlay);
+    parent.classList.toggle('show-gif', showOverlay);
   }, 10000);
 }
 
@@ -555,10 +556,25 @@ function drawChart(id, W, H, data, mn, mx, opts = {}) {
   const svg = document.getElementById(id);
   svg.innerHTML = '';
   const N  = data.length;
-  const PL = 28, PR = 8, PT = 8, PB = 16;
+  const PL = 36, PR = 8, PT = 12, PB = 16;
   const cW = W - PL - PR;
   const cH = H - PT - PB;
+
+  const xp = i => PL + i * (cW / (N - 1));
+  const yp = v => PT + cH - ((v - mn) / (mx - mn)) * cH;
+
+  if (opts.xLabels) {
+    opts.xLabels.forEach((lbl, i) => {
+      if (lbl) {
+        svgTxt(svg, lbl, xp(i), H - 2, 8, '#9bb7d3');
+      }
+    });
   }
+
+  // Draw Y-axis labels
+  const yFormat = opts.yFormat || (v => v);
+  svgTxt(svg, yFormat(mx), PL - 6, PT + 4, 10, '#9bb7d3', 'end');
+  svgTxt(svg, yFormat(mn), PL - 6, PT + cH, 10, '#9bb7d3', 'end');
 
   if (opts.bars) {
     const bW = cW / N * 0.55;
@@ -598,12 +614,14 @@ function renderAll(data) {
   document.getElementById('now-precip').className = 'now-val' + (data.precip[0] > 50  ? ' c-warn' : ' c-ok');
 
   if (nowIcon) {
-    const iconWithCacheBust = `${nowIcon}${nowIcon.includes('?') ? '&' : '?'}t=${Date.now()}`;
     const locIconEl = document.getElementById('loc-icon');
     const faviconEl = document.querySelector('link[rel="icon"]');
-    locIconEl.src = iconWithCacheBust;
+
+    const proxyUrl = `/icon?url=${encodeURIComponent(nowIcon)}`;
+    locIconEl.src = proxyUrl;
+
     if (faviconEl) {
-      faviconEl.href = iconWithCacheBust;
+      faviconEl.href = proxyUrl;
       faviconEl.type = 'image/png';
     }
   }
@@ -619,19 +637,29 @@ function renderAll(data) {
   const xLabels = data.hour.map(h =>
     h === 0 ? '12A' : h < 12 ? h + 'A' : h === 12 ? '12P' : (h - 12) + 'P'
   );
-  drawChart('cTemp',   260, 78, data.temp,   55, 85,
+  const cW = document.getElementById('cTemp').clientWidth || 260;
+  const cH = document.getElementById('cTemp').clientHeight || 78;
+
+  drawChart('cTemp',   cW, cH, data.temp,   55, 85,
     { lineColor:'#ff6b35', areaColor:'rgba(255,107,53,0.08)', xLabels });
-  drawChart('cPrecip', 260, 78, data.precip,  0, 100,
+  drawChart('cPrecip', cW, cH, data.precip,  0, 100,
     { bars:true, xLabels });
-  drawChart('cWind',   260, 78, data.speed,   0,  40,
+  drawChart('cWind',   cW, cH, data.speed,   0,  40,
     { lineColor:'#39d98a', areaColor:'rgba(57,217,138,0.07)', warnAt:35, xLabels });
 }
+
+let currentData = null;
+
+window.addEventListener('resize', () => {
+  if (currentData) renderAll(currentData);
+});
 
 // ── UPDATE LOOP ───────────────────────────────────────────────
 async function update() {
   showStatus('fetching', 'FETCHING LATEST FORECAST…');
   try {
     const data = await fetchWeatherData();
+    currentData = data;
     renderAll(data);
     hideStatus();
   } catch (err) {
@@ -658,7 +686,13 @@ setInterval(() => {
 
 setInterval(refreshGoesImage, 10 * 60 * 1000);
 
-update();
+if (initialData) {
+  currentData = initialData;
+  renderAll(initialData);
+  hideStatus();
+} else {
+  update();
+}
 </script>
 </body>
 </html>

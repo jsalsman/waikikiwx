@@ -1,0 +1,35 @@
+ * Serving Flask app 'app'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8080
+ * Running on http://192.168.0.2:8080
+[33mPress CTRL+C to quit[0m
+127.0.0.1 - - [29/Mar/2026 03:50:28] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 03:50:32] "GET /goes-airmass HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 04:55:38] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 04:55:39] "GET /goes-airmass HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 04:57:51] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 04:57:52] "GET /goes-airmass HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 05:00:29] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 05:00:29] "GET /goes-airmass HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 05:01:46] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 05:01:47] "GET /goes-airmass HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 06:00:45] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 06:00:49] "GET /goes-airmass HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 06:06:58] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 06:06:59] "GET /goes-airmass HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 06:12:42] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 06:12:43] "GET /goes-airmass HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 06:19:16] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 06:19:17] "GET /goes-airmass HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 06:36:05] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 06:36:05] "GET /goes-airmass HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 21:08:04] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 21:08:05] "GET /goes-airmass HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 21:13:04] "GET /forecast HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 21:19:58] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 21:19:58] "GET /goes-airmass HTTP/1.1" 200 -
+127.0.0.1 - - [29/Mar/2026 21:23:46] "[33mGET /icon?url=https://api.weather.gov/icons/land/day/wind_sct?size%3Dsmall HTTP/1.1[0m" 404 -
+127.0.0.1 - - [29/Mar/2026 21:26:26] "[33mHEAD /icon?url=https://api.weather.gov/icons/land/day/wind_sct?size%3Dsmall HTTP/1.1[0m" 404 -
+127.0.0.1 - - [29/Mar/2026 21:29:25] "[33mHEAD /icon?url=https://api.weather.gov/icons/land/day/wind_sct?size%3Dsmall HTTP/1.1[0m" 404 -

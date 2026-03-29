@@ -1,8 +1,8 @@
 import re
 import requests
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify, send_from_directory, render_template, request, Response
 
-app = Flask(__name__, static_folder='.')
+app = Flask(__name__, static_folder='.', template_folder='.')
 
 LAT = 21.3069
 LON = -157.8583
@@ -89,7 +89,13 @@ def debug():
 
 @app.route('/')
 def index():
-    return send_from_directory('.', 'index.html', mimetype='text/html')
+    data = None
+    try:
+        data = scrape_forecast()
+    except Exception as e:
+        app.logger.error(f'Failed to fetch initial forecast: {e}')
+
+    return render_template('index.html', data=data)
 
 
 @app.route('/forecast')
@@ -120,6 +126,22 @@ def goes_airmass():
         app.logger.error(msg)
         return jsonify({'error': msg}), 502
 
+@app.route('/icon')
+def fetch_icon():
+    url = request.args.get('url')
+    if not url:
+        return "No url parameter provided", 400
+    if not url.startswith('https://api.weather.gov/'):
+        return "Invalid URL domain", 403
+    try:
+        # NWS blocks standard User-Agents, spoofing it here
+        req_headers = {'User-Agent': HEADERS['User-Agent']}
+        resp = requests.get(url, headers=req_headers, timeout=15)
+        resp.raise_for_status()
+        return Response(resp.content, content_type=resp.headers.get('Content-Type'))
+    except Exception as e:
+        app.logger.error(f"Failed to fetch icon from {url}: {e}")
+        return "Failed to fetch icon", 502
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
