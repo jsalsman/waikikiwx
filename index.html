@@ -173,7 +173,7 @@ html, body {
   object-fit: cover; z-index: 0; opacity: 0; transition: opacity 0.5s;
   pointer-events: none;
 }
-.gif-swap-zone.show-gif .goes-overlay { opacity: 0.3; }
+.gif-swap-zone.show-gif .goes-overlay { opacity: 0.5; }
 .gif-swap-zone.show-gif .block { background: transparent !important; }
 .goes-wrap {
   width: 100%;
@@ -553,13 +553,17 @@ function attachGoesOverlay(parent) {
     </div>`;
   parent.appendChild(overlay);
   refreshGoesImage();
-  clearInterval(goesOverlayTimer);
-  let showOverlay = true;
-  parent.classList.add('show-gif');
-  goesOverlayTimer = setInterval(() => {
-    showOverlay = !showOverlay;
-    parent.classList.toggle('show-gif', showOverlay);
-  }, 10000);
+  clearTimeout(goesOverlayTimer);
+
+  function cycleOverlay() {
+    parent.classList.add('show-gif');
+    goesOverlayTimer = setTimeout(() => {
+      parent.classList.remove('show-gif');
+      goesOverlayTimer = setTimeout(cycleOverlay, 5000); // 5s off
+    }, 10000); // 10s on
+  }
+
+  cycleOverlay();
 }
 
 async function fetchGoesAirmassUrl() {
