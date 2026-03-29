@@ -1,7 +1,0 @@
-steps:
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-t', 'gcr.io/$PROJECT_ID/waikikiwx-image', '.']
-images:
-- 'gcr.io/$PROJECT_ID/waikikiwx-image'
-options:
-  logging: CLOUD_LOGGING_ONLY
