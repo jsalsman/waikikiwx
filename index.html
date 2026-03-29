@@ -41,10 +41,32 @@ html, body {
   height: var(--fh);
   background: var(--bg);
   display: flex;
+  flex-direction: column;
   background: rgba(0,200,255,0.08);
   border-top: 1px solid rgba(0,200,255,0.2);
   border-bottom: 1px solid rgba(0,200,255,0.2);
   color: var(--accent);
+}
+.status-bar {
+  flex-shrink: 0;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0 2%;
+  font-size: var(--fs);
+  background: rgba(0, 200, 255, 0.12);
+  border-top: 1px solid rgba(0, 200, 255, 0.3);
+  border-bottom: 1px solid rgba(0, 200, 255, 0.3);
+  color: var(--accent);
+  transition: height 0.2s ease, opacity 0.2s ease;
+}
+.status-bar.visible {
+  height: 5%;
+  min-height: 1.8em;
+  opacity: 1;
 }
 .status-bar.error {
   background: rgba(255,68,68,0.1);
@@ -95,8 +117,34 @@ html, body {
 .upd-lbl { font-size: var(--fs); color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.9; }
 .upd-val { font-size: var(--fs); color: var(--muted); }
 
-/* ── BODY ── */
+/* BODY */
 .body { flex: 1; display: flex; min-height: 0; overflow: hidden; }
+.charts-col {
+  width: calc(100% * 4 / 7);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.chart-panel {
+  flex: 1;
+  min-height: 0;
+  padding: 0.8% 1.2%;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+}
+.chart-panel:last-child { border-bottom: none; }
+.sec-lbl {
+  flex-shrink: 0;
+  font-size: var(--fs);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+}
 
 /* ── LEFT: 4 stacked 12-hour tables ── */
 .tbl-col {
