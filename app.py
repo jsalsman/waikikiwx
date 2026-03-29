@@ -1,8 +1,8 @@
 import re
 import requests
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify, send_from_directory, render_template
 
-app = Flask(__name__, static_folder='.')
+app = Flask(__name__, static_folder='.', template_folder='.')
 
 LAT = 21.3069
 LON = -157.8583
@@ -89,7 +89,13 @@ def debug():
 
 @app.route('/')
 def index():
-    return send_from_directory('.', 'index.html', mimetype='text/html')
+    data = None
+    try:
+        data = scrape_forecast()
+    except Exception as e:
+        app.logger.error(f'Failed to fetch initial forecast: {e}')
+    
+    return render_template('index.html', data=data)
 
 
 @app.route('/forecast')
