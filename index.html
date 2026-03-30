@@ -304,10 +304,11 @@ thead tr th { border-top: none; }
 @keyframes pulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:0.2;transform:scale(0.6);} }
 
 @media (max-width: 900px) and (orientation: portrait) {
-  html, body { overflow: auto; display: block; }
+  html, body { overflow: auto; display: block; height: auto; min-height: var(--vh); }
   .frame {
     width: 100vw;
     height: auto;
+    max-height: none;
     min-height: var(--vh);
     --fw: 100vw;
     --fh: auto;
