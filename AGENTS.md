@@ -17,6 +17,8 @@ These instructions apply to the entire repository.
    - `/goes-airmass`
    - `/health-check`
    - `/icon`
+   - `/screenshot.png`
+   - `/robots.txt`
 4. Validate HTML output (not only JSON):
    - Inspect returned HTML from `/` and ensure key UI nodes exist (`loc-icon`, `now-summary`, `tbl-col`, charts SVG ids).
    - Confirm favicon link is present and updated in runtime JS using current forecast icon URL.

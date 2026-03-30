@@ -24,6 +24,8 @@ Then open:
 - `http://127.0.0.1:8080/goes-airmass` for latest GOES West HI Air Mass GIF URL
 - `http://127.0.0.1:8080/health-check` for application health status
 - `http://127.0.0.1:8080/icon?url=...` for NWS icon proxying
+- `http://127.0.0.1:8080/screenshot.png` for the open graph screenshot image
+- `http://127.0.0.1:8080/robots.txt` for crawler rules
 
 ## What is shown
 

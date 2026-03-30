@@ -137,6 +137,16 @@ def goes_airmass():
         return jsonify({'error': msg}), 502
 
 
+@app.route('/screenshot.png')
+def screenshot():
+    return send_from_directory('.', 'screenshot.png')
+
+
+@app.route('/robots.txt')
+def robots():
+    return Response("User-agent: *\nAllow: /\n", content_type="text/plain")
+
+
 @app.route('/icon')
 def fetch_icon():
     url = request.args.get('url')
