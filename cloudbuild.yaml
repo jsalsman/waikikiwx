@@ -1,4 +1,44 @@
 steps:
+  - name: python:3.14-slim
+    id: Smoketests
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        # Fail on errors, showing commands attempted
+        set -euxo pipefail
+
+        echo 'Compiling all Python Files'
+        python -m compileall . -q
+
+        echo 'Creating .venv and installing dependencies'
+        python -m venv .venv
+        . .venv/bin/activate
+        pip install --upgrade pip
+        pip install -r requirements.txt
+
+        echo 'Starting dev server'
+        python app.py &
+        server_pid=$!
+        trap "kill $server_pid || true" EXIT
+
+        echo 'Installing curl to test server; also allows it time to start'
+        apt-get update > /dev/null
+        apt-get install -y curl > /dev/null
+
+        echo 'Making sure dev server responds with expected content'
+        curl -sS http://localhost:8080 > /tmp/response.html
+        if grep -q "and/or fork:" /tmp/response.html ; then
+          echo "Smoke test passed: expected content found in response."
+          exit 0
+        fi
+
+        echo 'Head and tail of bad response:'
+        head /tmp/response.html
+        tail /tmp/response.html
+
+        echo 'Smoke test failed: dev server did not serve expected content.'
+        exit 1
   - name: gcr.io/cloud-builders/docker
     args:
       - build

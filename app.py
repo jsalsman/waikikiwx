@@ -75,7 +75,13 @@ def get_goes_airmass_url(sector):
 
 @app.route('/health-check')
 def health_check():
-    return jsonify({"status": "ok"})
+    try:
+        resp = requests.get('https://api.weather.gov/', headers=HEADERS, timeout=5)
+        resp.raise_for_status()
+        return jsonify({"status": "ok", "api.weather.gov": "ok"})
+    except requests.RequestException as e:
+        app.logger.error(f'api.weather.gov health check failed: {e}')
+        return jsonify({"status": "error", "api.weather.gov": "unreachable"}), 500
 
 @app.route('/debug')
 def debug():
