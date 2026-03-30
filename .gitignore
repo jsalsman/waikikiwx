@@ -1,6 +1,6 @@
 venv/
-*.pyc
+__pycache__/
 *.log
-*.png
-*.mp4
 *.webm
+# had .png but e.g. screenshot.png
+tests/verification/
