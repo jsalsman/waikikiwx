@@ -12,9 +12,11 @@ These instructions apply to the entire repository.
 2. Run basic syntax check:
    - `python -m py_compile app.py`
 3. Run Flask endpoint sanity check using `app.test_client()` for:
+   - `/` (HTML)
    - `/forecast`
    - `/goes-airmass`
-   - `/` (HTML)
+   - `/health-check`
+   - `/icon`
 4. Validate HTML output (not only JSON):
    - Inspect returned HTML from `/` and ensure key UI nodes exist (`loc-icon`, `now-summary`, `tbl-col`, charts SVG ids).
    - Confirm favicon link is present and updated in runtime JS using current forecast icon URL.

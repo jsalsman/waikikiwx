@@ -273,9 +273,9 @@ thead tr th { border-top: none; }
   background: var(--panel);
   border-top: 1px solid var(--border);
 }
-.ftr-src { flex: 1; font-size: var(--fs); color: var(--muted); opacity: 0.82; letter-spacing: 0.05em; text-align: left; }
+.ftr-src { flex: 1; font-size: var(--fs); color: var(--muted); opacity: 0.82; letter-spacing: 0.05em; text-align: left; word-break: break-word; }
 .ftr-next { flex: 1; font-size: var(--fs); color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 0.5em; }
-.ftr-fork { flex: 1; font-size: var(--fs); color: var(--muted); opacity: 0.82; letter-spacing: 0.05em; text-align: right; }
+.ftr-fork { flex: 1; font-size: var(--fs); color: var(--muted); opacity: 0.82; letter-spacing: 0.05em; text-align: right; word-break: break-word; }
 .pulse {
   width: 0.5vmin; height: 0.5vmin; border-radius: 50%;
   background: var(--green);
@@ -304,7 +304,7 @@ thead tr th { border-top: none; }
     border-top: 1px solid var(--border);
   }
   .chart-panel, .block { min-height: 22vh; }
-  .ftr { min-height: 3.4em; }
+  .ftr { min-height: 3.4em; flex-wrap: wrap; height: auto; }
   .site-id { margin-bottom: 0.2em; }
   .now-summary { margin-bottom: 0.2em; }
 }
@@ -381,7 +381,7 @@ thead tr th { border-top: none; }
       <div class="pulse"></div>
       NEXT UPDATE <span id="cd">10:00</span>
     </div>
-    <div class="ftr-fork"><a href="https://paypal.me/jsalsman" style="color: inherit; text-decoration: underline;">PLEASE DONATE</a> &mdash; FORK ME: <a href="https://github.com/jsalsman/waikikiwx" style="color: inherit; text-decoration: underline;">github.com/jsalsman/waikikiwx</a></div>
+    <div class="ftr-fork"><a href="https://paypal.me/jsalsman" style="color: inherit; text-decoration: underline;">DONATE</a> and/or fork: <a href="https://github.com/jsalsman/waikikiwx" style="color: inherit; text-decoration: underline;">github.com/jsalsman/waikikiwx</a></div>
   </div>
 
 </div>
