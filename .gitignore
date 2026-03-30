@@ -1,1 +1,6 @@
 venv/
+*.pyc
+*.log
+*.png
+*.mp4
+*.mov
