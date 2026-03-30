@@ -83,17 +83,6 @@ def health_check():
         app.logger.error(f'api.weather.gov health check failed: {e}')
         return jsonify({"status": "error", "api.weather.gov": "unreachable"}), 500
 
-@app.route('/debug')
-def debug():
-    try:
-        url = get_forecast_hourly_url()
-        resp = requests.get(url, headers=HEADERS, timeout=15)
-        import json
-        snippet = json.dumps(resp.json()['properties']['periods'][:2], indent=2)
-        return f'<pre>Status: {resp.status_code}\nURL: {url}\n\n{snippet}</pre>'
-    except Exception as e:
-        return f'<pre>Error: {e}</pre>', 500
-
 @app.route('/')
 def index():
     data = None
