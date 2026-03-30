@@ -376,7 +376,7 @@ thead tr th { border-top: none; }
   </div>
 
   <div class="ftr">
-    <div class="ftr-src">NOAA / NWS HONOLULU · <a href="https://forecast.weather.gov" style="color: inherit; text-decoration: underline;">forecast.weather.gov</a></div>
+    <div class="ftr-src">NOAA / NWS HONOLULU · <a href="https://forecast.weather.gov" style="color: inherit; text-decoration: underline;">forecast.weather.gov</a> · 21.31°N 157.86°W</div>
     <div class="ftr-next">
       <div class="pulse"></div>
       NEXT UPDATE <span id="cd">10:00</span>
@@ -544,26 +544,20 @@ function renderTables(data) {
 }
 
 let goesOverlayTimer = null;
-let goesSectorIndex = 0;
-const GOES_SECTOR_ORDER = ['hi', 'tpw'];
-const GOES_SECTOR_LABELS = {
-  hi: 'Hawaii',
-  tpw: 'Tropical Pacific West',
-};
 
 function attachGoesOverlay(parent) {
   const overlay = document.createElement('div');
   overlay.className = 'goes-overlay';
   overlay.innerHTML = `
     <div class="goes-wrap">
-      <div class="goes-title" id="goes-title">GOES West Air Mass <span class="goes-time" id="goes-time">loading…</span></div>
+      <div class="goes-title">GOES West Hawaii Air Mass <span class="goes-time" id="goes-time">loading…</span></div>
       <img id="goes-img" alt="Latest GOES West Hawaii Air Mass animation">
     </div>`;
   parent.appendChild(overlay);
+  refreshGoesImage();
   clearTimeout(goesOverlayTimer);
 
   function cycleOverlay() {
-    refreshGoesImage();
     parent.classList.add('show-gif');
     goesOverlayTimer = setTimeout(() => {
       parent.classList.remove('show-gif');
@@ -578,25 +572,18 @@ async function fetchGoesAirmassUrl() {
   const response = await fetch('/goes-airmass');
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const data = await response.json();
-  if (data.error || !data.urls) throw new Error(data.error || 'Missing GOES URLs');
-  return data.urls;
+  if (data.error || !data.url) throw new Error(data.error || 'Missing GOES URL');
+  return data.url;
 }
 
 async function refreshGoesImage() {
   const goesImg = document.getElementById('goes-img');
   const goesTime = document.getElementById('goes-time');
-  const goesTitle = document.getElementById('goes-title');
-  if (!goesImg || !goesTime || !goesTitle) return;
+  if (!goesImg || !goesTime) return;
   try {
-    const urls = await fetchGoesAirmassUrl();
-    const currentSector = GOES_SECTOR_ORDER[goesSectorIndex % GOES_SECTOR_ORDER.length];
-    const url = urls[currentSector];
-    if (!url) throw new Error(`Missing GOES URL for sector ${currentSector}`);
+    const url = await fetchGoesAirmassUrl();
     goesImg.src = `${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}`;
-    const sectorLabel = GOES_SECTOR_LABELS[currentSector] || currentSector.toUpperCase();
-    goesTitle.childNodes[0].textContent = `GOES West ${sectorLabel} Air Mass `;
     goesTime.textContent = `· ${new Date().toLocaleTimeString('en-US', { timeZone: 'Pacific/Honolulu', hour: 'numeric', minute: '2-digit' })} HST`;
-    goesSectorIndex += 1;
   } catch (err) {
     console.error('[goes] fetch failed:', err);
     goesTime.textContent = '· unavailable';
@@ -752,10 +739,10 @@ function renderAll(data) {
   if (nowIcon) {
     const locIconEl = document.getElementById('loc-icon');
     const faviconEl = document.querySelector('link[rel="icon"]');
-    
+
     const proxyUrl = `/icon?url=${encodeURIComponent(nowIcon)}`;
     locIconEl.src = proxyUrl;
-    
+
     if (faviconEl) {
       faviconEl.href = proxyUrl;
       faviconEl.type = 'image/png';
