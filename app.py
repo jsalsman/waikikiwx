@@ -10,8 +10,8 @@ LON = -157.8583
 POINTS_URL = f'https://api.weather.gov/points/{LAT},{LON}'
 HOURS_WANTED = 48
 
-GOES_SECTOR_URL = 'https://www.star.nesdis.noaa.gov/goes/sector.php?sat=G18&sector=hi'
 GOES_CDN_PREFIX = 'https://cdn.star.nesdis.noaa.gov/'
+GOES_SECTORS = ('hi', 'tpw')
 
 # Cache the hourly forecast URL — gridpoint mapping never changes
 _forecast_hourly_url = None
@@ -64,13 +64,17 @@ def scrape_forecast():
     }
 
 
-def get_goes_airmass_url():
-    resp = requests.get(GOES_SECTOR_URL, timeout=15)
+def get_goes_airmass_url(sector):
+    sector_url = f'https://www.star.nesdis.noaa.gov/goes/sector.php?sat=G18&sector={sector}'
+    resp = requests.get(sector_url, timeout=15)
     resp.raise_for_status()
     html = resp.text
-    matches = re.findall(r'(?:https://cdn\.star\.nesdis\.noaa\.gov/)?GOES18/ABI/SECTOR/hi/AirMass/[A-Za-z0-9._/-]+?\.gif', html)
+    matches = re.findall(
+        rf'(?:https://cdn\.star\.nesdis\.noaa\.gov/)?GOES18/ABI/SECTOR/{sector}/AirMass/[A-Za-z0-9._/-]+?\.gif',
+        html,
+    )
     if not matches:
-        raise ValueError('No GOES Air Mass GIF URL found on NOAA sector page')
+        raise ValueError(f'No GOES Air Mass GIF URL found on NOAA sector page for sector={sector}')
     latest = matches[-1]
     return latest if latest.startswith('http') else GOES_CDN_PREFIX + latest
 
@@ -116,7 +120,8 @@ def forecast():
 @app.route('/goes-airmass')
 def goes_airmass():
     try:
-        return jsonify({'url': get_goes_airmass_url()})
+        urls = {sector: get_goes_airmass_url(sector) for sector in GOES_SECTORS}
+        return jsonify({'urls': urls})
     except requests.RequestException as e:
         msg = f'Upstream request failed: {e}'
         app.logger.error(msg)
