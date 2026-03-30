@@ -273,8 +273,9 @@ thead tr th { border-top: none; }
   background: var(--panel);
   border-top: 1px solid var(--border);
 }
-.ftr-src { font-size: var(--fs); color: var(--muted); opacity: 0.82; letter-spacing: 0.05em; }
-.ftr-next { font-size: var(--fs); color: var(--muted); display: flex; align-items: center; gap: 0.5em; }
+.ftr-src { flex: 1; font-size: var(--fs); color: var(--muted); opacity: 0.82; letter-spacing: 0.05em; text-align: left; }
+.ftr-next { flex: 1; font-size: var(--fs); color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 0.5em; }
+.ftr-fork { flex: 1; font-size: var(--fs); color: var(--muted); opacity: 0.82; letter-spacing: 0.05em; text-align: right; }
 .pulse {
   width: 0.5vmin; height: 0.5vmin; border-radius: 50%;
   background: var(--green);
@@ -380,6 +381,7 @@ thead tr th { border-top: none; }
       <div class="pulse"></div>
       NEXT UPDATE <span id="cd">10:00</span>
     </div>
+    <div class="ftr-fork">FORK ME: <a href="https://github.com/jsalsman/waikikiwx" style="color: inherit; text-decoration: underline;">github.com/jsalsman/waikikiwx</a></div>
   </div>
 
 </div>
