@@ -303,7 +303,9 @@ thead tr th { border-top: none; }
     border-right: none;
     border-top: 1px solid var(--border);
   }
-  .chart-panel, .block { min-height: 22vh; }
+  .chart-panel { min-height: 15vh; }
+  .block { min-height: auto; flex: none; }
+  .gif-swap-zone { padding-bottom: 25vh; }
   .ftr { min-height: 3.4em; flex-wrap: wrap; height: auto; }
   .site-id { margin-bottom: 0.2em; }
   .now-summary { margin-bottom: 0.2em; }
@@ -697,6 +699,18 @@ function drawChart(id, W, H, data, defaultMn, defaultMx, opts = {}) {
   });
 
   // Draw X-axis labels
+  // Draw day separators
+  if (opts.dayChangeIndices) {
+    opts.dayChangeIndices.forEach(i => {
+      const x = xp(i);
+      svg.appendChild(svgEl('line', {
+        x1: x, y1: PT, x2: x, y2: PT + cH,
+        stroke: 'rgba(255,255,255,0.2)', 'stroke-width': 1, 'stroke-dasharray': '4,4'
+      }));
+    });
+  }
+
+  // Draw X-axis labels
   if (opts.xLabels) {
     // Determine a safe step for X labels to avoid overlap
     const labelWidthEstimate = 20;
@@ -773,15 +787,17 @@ function renderAll(data) {
   const xLabels = data.hour.map(h =>
     h === 0 ? '12A' : h < 12 ? h + 'A' : h === 12 ? '12P' : (h - 12) + 'P'
   );
+  const dayChangeIndices = [];
+  data.hour.forEach((h, i) => { if (i > 0 && h === 0) dayChangeIndices.push(i); });
   const cW = document.getElementById('cTemp').clientWidth || 260;
   const cH = document.getElementById('cTemp').clientHeight || 78;
 
   drawChart('cTemp',   cW, cH, data.temp,   55, 85,
-    { lineColor:'#ff6b35', areaColor:'rgba(255,107,53,0.08)', xLabels });
+    { lineColor:'#ff6b35', areaColor:'rgba(255,107,53,0.08)', xLabels, dayChangeIndices });
   drawChart('cPrecip', cW, cH, data.precip,  0, 100,
-    { bars:true, xLabels });
+    { bars:true, xLabels, dayChangeIndices });
   drawChart('cWind',   cW, cH, data.speed,   0,  40,
-    { lineColor:'#39d98a', areaColor:'rgba(57,217,138,0.07)', warnAt:35, xLabels });
+    { lineColor:'#39d98a', areaColor:'rgba(57,217,138,0.07)', warnAt:35, xLabels, dayChangeIndices });
 }
 
 let currentData = null;
