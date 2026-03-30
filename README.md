@@ -22,6 +22,8 @@ Then open:
 - `http://127.0.0.1:8080/debug` to inspect a raw NOAA/NWS period sample
 - `http://127.0.0.1:8080/forecast` for JSON consumed by the front-end
 - `http://127.0.0.1:8080/goes-airmass` for latest GOES West HI Air Mass GIF URL
+- `http://127.0.0.1:8080/health-check` for application health status
+- `http://127.0.0.1:8080/icon?url=...` for NWS icon proxying
 
 ## What is shown
 

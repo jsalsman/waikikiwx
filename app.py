@@ -2,7 +2,7 @@ import re
 import requests
 from flask import Flask, jsonify, send_from_directory, render_template, request, Response
 
-app = Flask(__name__, static_folder='.', template_folder='.')
+app = Flask(__name__, template_folder='.')
 
 LAT = 21.3069
 LON = -157.8583
