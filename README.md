@@ -11,6 +11,15 @@ Single-page live 48-hour weather forecast dashboard for Waikiki, Oahu, Hawaii.
 
 ![Screenshot of the project](screenshot.png)
 
+## What is shown
+
+- 48 hours of hourly forecast data from `api.weather.gov`
+- Header “now” values (Hour, Wind Dir, Wind mph, Temp, Precip)
+- Current `shortForecast` summary text below the five header metrics
+- Current hourly forecast icon shown left of the **WAIKIKI** title
+- The same current icon is applied as the browser favicon dynamically
+- GOES West Hawaii Air Mass animation overlay over the lower (25–48h) table zone
+
 ## Local run
 
 ```bash
@@ -28,15 +37,6 @@ Then open:
 - `http://127.0.0.1:8080/icon?url=...` for NWS icon proxying
 - `http://127.0.0.1:8080/screenshot.png` for the open graph screenshot image
 - `http://127.0.0.1:8080/robots.txt` for crawler rules
-
-## What is shown
-
-- 48 hours of hourly forecast data from `api.weather.gov`
-- Header “now” values (Hour, Wind Dir, Wind mph, Temp, Precip)
-- Current `shortForecast` summary text below the five header metrics
-- Current hourly forecast icon shown left of the **WAIKIKI** title
-- The same current icon is applied as the browser favicon dynamically
-- GOES West Hawaii Air Mass animation overlay over the lower (25–48h) table zone
 
 ## Quick validation checklist
 
