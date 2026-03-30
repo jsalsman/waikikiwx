@@ -79,8 +79,8 @@ def get_goes_airmass_url(sector):
     return latest if latest.startswith('http') else GOES_CDN_PREFIX + latest
 
 
-@app.route('/healthz')
-def healthz():
+@app.route('/health-check')
+def health_check():
     return jsonify({"status": "ok"})
 
 
