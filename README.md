@@ -1,7 +1,7 @@
 # waikikiwx
 
-[![Try on Google Cloud Run](https://img.shields.io/badge/Try_on_Cloud_Run-darkgreen)](https://waikikiwx.live/)
-[![App health](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fwaikikiwx.live%2Fhealth-check&query=%24.status&label=Agent%20health&color=brightgreen&labelColor=indigo)](https://waikikiwx.live/health-check)
+[![Try on Google Cloud Run](https://img.shields.io/badge/Try_on_Google_Cloud_Run-darkgreen)](https://waikikiwx.live/)
+[![App health](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fwaikikiwx.live%2Fhealth-check&query=%24.status&label=App%20health&color=brightgreen&labelColor=indigo)](https://waikikiwx.live/health-check)
 [![Python version 3.14](https://img.shields.io/badge/Python-3.13-blue?logo=python)](https://www.python.org/downloads/)
 [![Flask version 3.1](https://img.shields.io/badge/Flask-3.1-black?logo=flask)](https://flask.palletsprojects.com/)
 [![MIT License](https://img.shields.io/badge/License-MIT-brightgreen)](https://opensource.org/licenses/MIT)
