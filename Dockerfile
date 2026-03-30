@@ -3,7 +3,7 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 
 # Create non-root user 
-RUN useradd --no-log-init --home-dir /app appuser
+RUN useradd --no-log-init appuser
 USER appuser
 
 # Install dependencies for a separate cacheable docker layer
