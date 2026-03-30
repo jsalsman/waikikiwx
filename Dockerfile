@@ -1,9 +1,9 @@
 FROM python:3.14-slim
-WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 
 # Create non-root user 
-RUN useradd --no-log-init appuser
+RUN useradd --no-log-init --home-dir /app appuser
+WORKDIR /app
 USER appuser
 
 # Install dependencies for a separate cacheable docker layer
