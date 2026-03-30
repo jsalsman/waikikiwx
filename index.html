@@ -589,19 +589,30 @@ function attachGoesOverlay(parent) {
     refreshGoesImage();
     parent.classList.add('show-gif');
     goesOverlayTimer = setTimeout(() => {
-      parent.classList.remove('show-gif');
-      goesOverlayTimer = setTimeout(cycleOverlay, 5000); // 5s off
-    }, 10000); // 10s on
+      refreshGoesImage();
+      goesOverlayTimer = setTimeout(() => {
+        parent.classList.remove('show-gif');
+        goesOverlayTimer = setTimeout(cycleOverlay, 5000); // 5s off
+      }, 5000); // 5s on (second gif)
+    }, 5000); // 5s on (first gif)
   }
 
   cycleOverlay();
 }
 
+let goesAirmassUrlsCache = null;
+let goesAirmassUrlsTime = 0;
+
 async function fetchGoesAirmassUrl() {
+  if (goesAirmassUrlsCache && (Date.now() - goesAirmassUrlsTime < 10 * 60 * 1000)) {
+    return goesAirmassUrlsCache;
+  }
   const response = await fetch('/goes-airmass');
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const data = await response.json();
   if (data.error || !data.urls) throw new Error(data.error || 'Missing GOES URLs');
+  goesAirmassUrlsCache = data.urls;
+  goesAirmassUrlsTime = Date.now();
   return data.urls;
 }
 
