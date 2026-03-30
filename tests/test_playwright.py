@@ -64,5 +64,31 @@ class PlaywrightTestCase(unittest.TestCase):
         page.screenshot(path='tests/verification/screenshot.png')
         page.close()
 
+    def test_video_capture(self):
+        # Create a new context specifically for video recording
+        context = self.browser.new_context(record_video_dir="tests/verification/")
+        page = context.new_page()
+        page.goto('http://127.0.0.1:8080/')
+
+        # Wait for 30 seconds to capture the movie
+        page.wait_for_timeout(30000)
+
+        # Close the context to ensure the video is saved
+        context.close()
+
+    def test_mobile_screenshot(self):
+        # Create a new context with a mobile viewport
+        context = self.browser.new_context(
+            viewport={'width': 375, 'height': 812},
+            is_mobile=True,
+            has_touch=True
+        )
+        page = context.new_page()
+        page.goto('http://127.0.0.1:8080/')
+
+        # Take a mobile screenshot for verification
+        page.screenshot(path='tests/verification/mobile_screenshot.png')
+        context.close()
+
 if __name__ == '__main__':
     unittest.main()
