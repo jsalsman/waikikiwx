@@ -21,7 +21,6 @@ HEADERS = {
     'Accept': 'application/geo+json',
 }
 
-
 def get_forecast_hourly_url():
     global _forecast_hourly_url
     if _forecast_hourly_url:
@@ -31,18 +30,15 @@ def get_forecast_hourly_url():
     _forecast_hourly_url = resp.json()['properties']['forecastHourly']
     return _forecast_hourly_url
 
-
+WIND_SPEED_RE = re.compile(r'\d+')
 def parse_wind_speed(s):
     # "20 mph" or "15 to 20 mph" — take the higher number
-    import re
-    nums = re.findall(r'\d+', s or '')
+    nums = WIND_SPEED_RE.findall(s or '')
     return max(int(n) for n in nums) if nums else 0
-
 
 def hour_from_iso(iso):
     # "2026-03-28T19:00:00-10:00" → 19
     return int(iso.split('T')[1][:2])
-
 
 def scrape_forecast():
     url = get_forecast_hourly_url()
@@ -63,7 +59,6 @@ def scrape_forecast():
         'short':     [p.get('shortForecast', '') for p in periods],
     }
 
-
 def get_goes_airmass_url(sector):
     sector_url = f'https://www.star.nesdis.noaa.gov/goes/sector.php?sat=G18&sector={sector}'
     resp = requests.get(sector_url, timeout=15)
@@ -78,11 +73,9 @@ def get_goes_airmass_url(sector):
     latest = matches[-1]
     return latest if latest.startswith('http') else GOES_CDN_PREFIX + latest
 
-
 @app.route('/health-check')
 def health_check():
     return jsonify({"status": "ok"})
-
 
 @app.route('/debug')
 def debug():
@@ -95,7 +88,6 @@ def debug():
     except Exception as e:
         return f'<pre>Error: {e}</pre>', 500
 
-
 @app.route('/')
 def index():
     data = None
@@ -105,7 +97,6 @@ def index():
         app.logger.error(f'Failed to fetch initial forecast: {e}')
     
     return render_template('index.html', data=data)
-
 
 @app.route('/forecast')
 def forecast():
@@ -121,7 +112,6 @@ def forecast():
         app.logger.error(msg)
         return jsonify({'error': msg}), 502
 
-
 @app.route('/goes-airmass')
 def goes_airmass():
     try:
@@ -136,16 +126,13 @@ def goes_airmass():
         app.logger.error(msg)
         return jsonify({'error': msg}), 502
 
-
 @app.route('/screenshot.png')
 def screenshot():
     return send_from_directory('.', 'screenshot.png')
 
-
 @app.route('/robots.txt')
 def robots():
     return Response("User-agent: *\nAllow: /\n", content_type="text/plain")
-
 
 @app.route('/icon')
 def fetch_icon():
@@ -163,7 +150,6 @@ def fetch_icon():
     except Exception as e:
         app.logger.error(f"Failed to fetch icon from {url}: {e}")
         return "Failed to fetch icon", 502
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
