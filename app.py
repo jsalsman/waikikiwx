@@ -13,22 +13,27 @@ HOURS_WANTED = 48
 GOES_CDN_PREFIX = 'https://cdn.star.nesdis.noaa.gov/'
 GOES_SECTORS = ('hi', 'tpw')
 
-# Cache the hourly forecast URL — gridpoint mapping never changes
+# Cache the URLs — gridpoint mapping never changes
 _forecast_hourly_url = None
+_forecast_grid_data_url = None
 
 HEADERS = {
     'User-Agent': 'waikikiwx (github.com/jsalsman/waikikiwx)',
     'Accept': 'application/geo+json',
 }
 
-def get_forecast_hourly_url():
-    global _forecast_hourly_url
-    if _forecast_hourly_url:
-        return _forecast_hourly_url
+def get_forecast_urls():
+    global _forecast_hourly_url, _forecast_grid_data_url
+    if _forecast_hourly_url and _forecast_grid_data_url:
+        return _forecast_hourly_url, _forecast_grid_data_url
     resp = requests.get(POINTS_URL, headers=HEADERS, timeout=15)
     resp.raise_for_status()
-    _forecast_hourly_url = resp.json()['properties']['forecastHourly']
-    return _forecast_hourly_url
+    props = resp.json()['properties']
+    _forecast_hourly_url = props['forecastHourly']
+    _forecast_grid_data_url = props['forecastGridData']
+    return _forecast_hourly_url, _forecast_grid_data_url
+
+import datetime
 
 WIND_SPEED_RE = re.compile(r'\d+')
 def parse_wind_speed(s):
@@ -40,23 +45,118 @@ def hour_from_iso(iso):
     # "2026-03-28T19:00:00-10:00" → 19
     return int(iso.split('T')[1][:2])
 
-def scrape_forecast():
-    url = get_forecast_hourly_url()
-    resp = requests.get(url, headers=HEADERS, timeout=15)
-    resp.raise_for_status()
+def parse_iso8601_duration(d):
+    # e.g., P1D, PT3H, P1DT6H
+    # Returns total duration in hours
+    days = 0
+    hours = 0
 
-    periods = resp.json()['properties']['periods'][:HOURS_WANTED]
+    # Extract days
+    m_days = re.search(r'P(\d+)D', d)
+    if m_days:
+        days = int(m_days.group(1))
+
+    # Extract hours
+    m_hours = re.search(r'T(?:.*?(\d+)H)?', d)
+    if m_hours and m_hours.group(1):
+        hours = int(m_hours.group(1))
+
+    total_hours = (days * 24) + hours
+    return total_hours if total_hours > 0 else 1
+
+def map_grid_series_to_hourly(series_values, hourly_dts, converter=None):
+    # series_values: [{'validTime': '2026-03-30T10:00:00+00:00/PT3H', 'value': 21.6}, ...]
+    # hourly_dts: list of datetime objects (timezone-aware)
+    # returns list of values matching hourly_dts
+
+    parsed_series = []
+    for item in series_values:
+        val = item.get('value')
+        if val is None:
+            continue
+        vt = item.get('validTime')
+        if not vt or '/' not in vt:
+            continue
+        dt_str, dur_str = vt.split('/')
+        start_dt = datetime.datetime.fromisoformat(dt_str)
+        dur_h = parse_iso8601_duration(dur_str)
+        end_dt = start_dt + datetime.timedelta(hours=dur_h)
+        parsed_series.append((start_dt, end_dt, val))
+
+    res = []
+    for dt in hourly_dts:
+        matched_val = None
+        for start_dt, end_dt, val in parsed_series:
+            # We assume dt is timezone aware and so are start_dt/end_dt
+            if start_dt <= dt < end_dt:
+                matched_val = val
+                break
+        if matched_val is not None and converter is not None:
+            matched_val = converter(matched_val)
+        res.append(matched_val)
+    return res
+
+def scrape_forecast():
+    hourly_url, grid_url = get_forecast_urls()
+
+    # 1. Fetch hourly
+    resp_hourly = requests.get(hourly_url, headers=HEADERS, timeout=15)
+    resp_hourly.raise_for_status()
+
+    periods = resp_hourly.json()['properties']['periods'][:HOURS_WANTED]
     if not periods:
         raise ValueError('No forecast periods returned from API')
 
+    hourly_dts = [datetime.datetime.fromisoformat(p['startTime']) for p in periods]
+
+    # 2. Fetch grid for apparentTemp and windGust
+    resp_grid = requests.get(grid_url, headers=HEADERS, timeout=15)
+    resp_grid.raise_for_status()
+    grid_props = resp_grid.json().get('properties', {})
+
+    raw_apparent = grid_props.get('apparentTemperature', {}).get('values', [])
+    # C to F converter
+    def c_to_f(c): return round(c * 9/5 + 32)
+    apparent_temp = map_grid_series_to_hourly(raw_apparent, hourly_dts, converter=c_to_f)
+
+    raw_gust = grid_props.get('windGust', {}).get('values', [])
+    # km/h to mph converter
+    def kmh_to_mph(kmh): return round(kmh / 1.60934)
+    wind_gust = map_grid_series_to_hourly(raw_gust, hourly_dts, converter=kmh_to_mph)
+
+    raw_qpf = grid_props.get('quantitativePrecipitation', {}).get('values', [])
+    # mm to inches converter
+    def mm_to_in(mm): return round(mm / 25.4, 2)
+    precip_in = map_grid_series_to_hourly(raw_qpf, hourly_dts, converter=mm_to_in)
+
+    # In case there's no gust data or missing values, we'll fill None with speed
+    speed = [parse_wind_speed(p['windSpeed']) for p in periods]
+    for i in range(len(wind_gust)):
+        if wind_gust[i] is None:
+            wind_gust[i] = speed[i]
+        elif wind_gust[i] < speed[i]:
+            wind_gust[i] = speed[i]
+
+    temp = [p['temperature'] for p in periods]
+    for i in range(len(apparent_temp)):
+        if apparent_temp[i] is None:
+            apparent_temp[i] = temp[i]
+
+    for i in range(len(precip_in)):
+        if precip_in[i] is None:
+            precip_in[i] = 0.0
+
     return {
-        'hour':      [hour_from_iso(p['startTime']) for p in periods],
-        'direction': [p['windDirection'] for p in periods],
-        'speed':     [parse_wind_speed(p['windSpeed']) for p in periods],
-        'temp':      [p['temperature'] for p in periods],
-        'precip':    [p['probabilityOfPrecipitation']['value'] or 0 for p in periods],
-        'icon':      [p.get('icon', '') for p in periods],
-        'short':     [p.get('shortForecast', '') for p in periods],
+        'hour':          [hour_from_iso(p['startTime']) for p in periods],
+        'direction':     [p['windDirection'] for p in periods],
+        'speed':         speed,
+        'gust':          wind_gust,
+        'temp':          temp,
+        'apparent_temp': apparent_temp,
+        'precip':        [p['probabilityOfPrecipitation']['value'] or 0 for p in periods],
+        'precip_in':     precip_in,
+        'icon':          [p.get('icon', '') for p in periods],
+        'short':         [p.get('shortForecast', '') for p in periods],
     }
 
 def get_goes_airmass_url(sector):

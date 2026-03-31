@@ -56,6 +56,10 @@ class PlaywrightTestCase(unittest.TestCase):
         self.assertTrue(page.locator('#now-summary').is_visible())
         self.assertTrue(page.locator('.ftr-fork').is_visible())
 
+        # Check for dashed overlays in temp and wind graphs
+        self.assertTrue(page.locator("#cTemp path[stroke-dasharray]").is_visible())
+        self.assertTrue(page.locator("#cWind path[stroke-dasharray]").is_visible())
+
         # Check that the fork link contains the expected text
         fork_text = page.locator('.ftr-fork').inner_text()
         self.assertIn("and/or fork:", fork_text)
