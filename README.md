@@ -20,6 +20,12 @@ Single-page live 48-hour weather forecast dashboard for Waikiki, Honolulu, Oahu,
 - The same current icon is applied as the browser favicon dynamically
 - GOES West Hawaii Air Mass animation overlay over the lower (25–48h) table zone
 
+The primary data source for this dashboard is the National Weather Service (NWS) API (`api.weather.gov`). By querying the specific grid coordinates for Waikiki, the application retrieves highly localized, hourly forecast data. This includes quantitative metrics such as expected temperature, wind speed and direction, wind gusts, apparent temperature (incorporating heat index and wind chill), precipitation probability, and expected precipitation amount. The NWS API also supplies qualitative data in the form of `shortForecast` text summaries and corresponding weather icons for each forecasted hour.
+
+In addition to the localized forecast, the dashboard integrates satellite imagery from the NOAA GOES West satellite, specifically sourced from the NESDIS STAR (Center for Satellite Applications and Research) content delivery network. The application dynamically fetches the latest Air Mass RGB (Red-Green-Blue) animated GIFs for the Hawaii and Tropical Pacific West sectors. Air Mass imagery highlights the temperature and moisture characteristics of different air masses, making it easier to visually analyze large-scale weather systems, fronts, and atmospheric dynamics over the Pacific Ocean.
+
+These distinct data streams are synthesized into a comprehensive and unified visual display. The numerical NWS data is rendered into precise hourly tables and SVG sparkline graphs, where primary metrics (temperature, precipitation probability, and wind speed) are shown as solid lines or solid bars, and secondary metrics (apparent temperature, precipitation amount, and wind gusts) are depicted as dashed lines or dashed overlays. The GOES Air Mass satellite animations are strategically applied as semi-transparent, looping background overlays beneath the lower table zone (representing forecast hours 25 through 48), providing users with a macro-level visual context of the atmospheric conditions corresponding to the later half of the forecast period.
+
 ## Local run
 
 ```bash
