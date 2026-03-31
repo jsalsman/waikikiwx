@@ -384,15 +384,15 @@ thead tr th { border-top: none; }
     <div class="tbl-col" id="tbl-col"></div>
     <div class="charts-col">
       <div class="chart-panel">
-        <div class="sec-lbl">Temperature (°F)</div>
+        <div class="sec-lbl">Temperature <span style="font-size: 0.8em; opacity: 0.7; margin-left: 0.5em; text-transform: lowercase; font-style: italic;">(dashed: apparent)</span></div>
         <svg id="cTemp" style="width:100%; height:100%;"></svg>
       </div>
       <div class="chart-panel">
-        <div class="sec-lbl">Precipitation (%)</div>
+        <div class="sec-lbl">Precipitation <span style="font-size: 0.8em; opacity: 0.7; margin-left: 0.5em; text-transform: lowercase; font-style: italic;">(% and text: inches)</span></div>
         <svg id="cPrecip" style="width:100%; height:100%;"></svg>
       </div>
       <div class="chart-panel">
-        <div class="sec-lbl">Wind Speed (mph)</div>
+        <div class="sec-lbl">Wind Speed <span style="font-size: 0.8em; opacity: 0.7; margin-left: 0.5em; text-transform: lowercase; font-style: italic;">(dashed: gust)</span></div>
         <svg id="cWind" style="width:100%; height:100%;"></svg>
       </div>
     </div>
@@ -672,13 +672,17 @@ function drawChart(id, W, H, data, defaultMn, defaultMx, opts = {}) {
 
   const N = data.length;
   // Professional padding
-  const PL = 36, PR = 16, PT = 16, PB = 20;
+  const PL = 36, PR = (opts.textData && opts.rightAxisMax !== undefined) ? 36 : 16, PT = 16, PB = 20;
   const cW = W - PL - PR;
   const cH = H - PT - PB;
 
   // Calculate dynamic ticks
   let min = Math.min(...data, defaultMn);
   let max = Math.max(...data, defaultMx);
+  if (opts.overlayData) {
+      min = Math.min(min, ...opts.overlayData);
+      max = Math.max(max, ...opts.overlayData);
+  }
   if (min === max) { min -= 1; max += 1; }
 
   // Custom domains for specific charts for better aesthetics
@@ -730,6 +734,18 @@ function drawChart(id, W, H, data, defaultMn, defaultMx, opts = {}) {
     svgTxt(svg, tick, PL - 8, y + 4, 11, '#9bb7d3', 'end');
   });
 
+  // Optional: Draw Secondary Y-axis for textData (e.g. inches)
+  if (opts.textData && opts.rightAxisMax !== undefined) {
+    const rMax = opts.rightAxisMax;
+    // We'll just draw a few fixed ticks on the right side
+    const rTicks = [0, rMax / 2, rMax];
+    rTicks.forEach(tick => {
+      // mapping tick to pixel height
+      const y = PT + cH - (tick / (rMax || 1)) * cH;
+      svgTxt(svg, tick.toFixed(2), W - PR + 4, y + 4, 11, '#9bb7d3', 'start');
+    });
+  }
+
   // Draw X-axis labels
   // Draw day separators
   if (opts.dayChangeIndices) {
@@ -766,6 +782,19 @@ function drawChart(id, W, H, data, defaultMn, defaultMx, opts = {}) {
       if (bh <= 0) return;
       const fill = v >= 50 ? '#ff4444' : v >= 30 ? '#ffcc00' : '#00c8ff';
       svg.appendChild(svgEl('rect', { x, y, width: bW, height: bh, fill, rx: 1, opacity: 0.85 }));
+
+      // Optionally overlay text data on bars mapped to the right axis scale
+      if (opts.textData && opts.rightAxisMax !== undefined && opts.textData[i] > 0) {
+        // Find Y position for the right axis
+        const rightY = PT + cH - (opts.textData[i] / (opts.rightAxisMax || 1)) * cH;
+        // Optionally draw a small dot/indicator or just the text
+        // If we just want text positioned roughly at the bar top or at the scaled rightY:
+        // We'll place it slightly above the bar y or rightY, whichever makes more sense
+        // To be visually aligned with the right axis, we should position it at rightY
+        svgTxt(svg, opts.textData[i].toFixed(2), x + bW / 2, rightY - 4, 9, '#ffffff', 'middle');
+        // Let's add a small dashed line or dot so they know where the value is
+        svg.appendChild(svgEl('circle', { cx: x + bW / 2, cy: rightY, r: 2, fill: '#ffffff', opacity: 0.8 }));
+      }
     });
   } else {
     const lineD = data.map((v, i) =>
@@ -774,6 +803,16 @@ function drawChart(id, W, H, data, defaultMn, defaultMx, opts = {}) {
 
     // Solid fill with opacity
     svg.appendChild(svgEl('path', { d: areaD, fill: opts.areaColor || 'rgba(0,200,255,0.1)', stroke: 'none' }));
+
+    // Optional overlay data (like apparent temp or gust)
+    if (opts.overlayData) {
+        const overlayLineD = opts.overlayData.map((v, i) =>
+          `${i === 0 ? 'M' : 'L'}${xp(i).toFixed(1)},${yp(v).toFixed(1)}`).join(' ');
+
+        svg.appendChild(svgEl('path', { d: overlayLineD, fill: 'none', stroke: opts.overlayColor || '#ffffff',
+          'stroke-width': 1.5, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'stroke-dasharray': '4,4', opacity: 0.8 }));
+    }
+
     svg.appendChild(svgEl('path', { d: lineD, fill: 'none', stroke: opts.lineColor || '#00c8ff',
       'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
   }
@@ -824,12 +863,25 @@ function renderAll(data) {
   const cW = document.getElementById('cTemp').clientWidth || 260;
   const cH = document.getElementById('cTemp').clientHeight || 78;
 
+  // Force overlay data array to be strictly separated if they match base values (to avoid visual burying of the dashed line)
+  // Or rather, we can just slightly shift it by a tiny visual offset so it's always visible if it equals exactly.
+  // Actually, standard practice is just plotting it; but since we want to guarantee the dashed line is visible:
+  const offsetApparent = data.apparent_temp.map((v, i) => v === data.temp[i] ? v + 0.3 : v);
+  const offsetGust = data.gust.map((v, i) => v === data.speed[i] ? v + 0.3 : v);
+
   drawChart('cTemp',   cW, cH, data.temp,   55, 85,
-    { lineColor:'#ff6b35', areaColor:'rgba(255,107,53,0.08)', xLabels, dayChangeIndices });
+    { lineColor:'#ff6b35', areaColor:'rgba(255,107,53,0.08)', overlayData: offsetApparent, overlayColor: '#ffaa88', xLabels, dayChangeIndices });
+
+  // Calculate precip_in max for right axis scale
+  let maxPrecipIn = Math.max(...data.precip_in, 0.5); // Fallback to 0.5 inches if all 0
+  if (maxPrecipIn < 1.0) maxPrecipIn = 1.0;
+  else maxPrecipIn = Math.ceil(maxPrecipIn); // e.g. 1.2 -> 2.0
+
   drawChart('cPrecip', cW, cH, data.precip,  0, 100,
-    { bars:true, xLabels, dayChangeIndices });
+    { bars:true, textData: data.precip_in, rightAxisMax: maxPrecipIn, xLabels, dayChangeIndices });
+
   drawChart('cWind',   cW, cH, data.speed,   0,  40,
-    { lineColor:'#39d98a', areaColor:'rgba(57,217,138,0.07)', warnAt:35, xLabels, dayChangeIndices });
+    { lineColor:'#39d98a', areaColor:'rgba(57,217,138,0.07)', overlayData: offsetGust, overlayColor: '#88ffbb', warnAt:35, xLabels, dayChangeIndices });
 }
 
 let currentData = null;
