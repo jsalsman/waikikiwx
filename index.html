@@ -195,7 +195,8 @@ html, body {
 }
 .gif-swap-zone.show-tpw .goes-overlay.tpw-overlay { opacity: 0.9; }
 .gif-swap-zone.show-hi .goes-overlay.hi-overlay { opacity: 0.9; }
-.gif-swap-zone.show-tpw .block, .gif-swap-zone.show-hi .block { background: transparent !important; }
+.gif-swap-zone.show-phmo .goes-overlay.phmo-overlay { opacity: 0.9; }
+.gif-swap-zone.show-tpw .block, .gif-swap-zone.show-hi .block, .gif-swap-zone.show-phmo .block { background: transparent !important; }
 .goes-wrap {
   z-index: 9999;
   width: 100%;
@@ -277,7 +278,8 @@ html, body {
   transition: opacity 0.3s;
 }
 .show-tpw .goes-marker-layer.tpw-marker-layer,
-.show-hi .goes-marker-layer.hi-marker-layer {
+.show-hi .goes-marker-layer.hi-marker-layer,
+.show-phmo .goes-marker-layer.phmo-marker-layer {
   opacity: 1;
 }
 .goes-dot {
@@ -682,6 +684,20 @@ function attachGoesOverlay(parent) {
     </div>`;
   parent.appendChild(overlayTpw);
 
+  const overlayPhmo = document.createElement('div');
+  overlayPhmo.className = 'goes-overlay phmo-overlay';
+  overlayPhmo.innerHTML = `
+    <div class="goes-wrap">
+      <div class="goes-title" id="goes-title-phmo">NWS Hawaii Radar loop <span class="goes-time" id="goes-time-phmo">loading…</span></div>
+      <div class="goes-img-wrap">
+        <img id="goes-img-phmo" alt="Latest NWS Hawaii Radar loop animation">
+        <div class="goes-marker-layer phmo-marker-layer" id="goes-marker-layer-phmo">
+          <div class="goes-dot"></div>
+        </div>
+      </div>
+    </div>`;
+  parent.appendChild(overlayPhmo);
+
   clearTimeout(goesOverlayTimer);
 
   loadGoesImages();
@@ -693,7 +709,11 @@ function attachGoesOverlay(parent) {
       parent.classList.add('show-tpw');
       goesOverlayTimer = setTimeout(() => {
         parent.classList.remove('show-tpw');
-        goesOverlayTimer = setTimeout(cycleOverlay, 4000); // 4s off
+        parent.classList.add('show-phmo');
+        goesOverlayTimer = setTimeout(() => {
+          parent.classList.remove('show-phmo');
+          goesOverlayTimer = setTimeout(cycleOverlay, 4000); // 4s off
+        }, 6000); // 6s on (phmo gif)
       }, 6000); // 6s on (tpw gif)
     }, 6000); // 6s on (hi gif)
   }
@@ -722,12 +742,28 @@ async function loadGoesImages() {
   const goesTimeHi = document.getElementById('goes-time-hi');
   const goesImgTpw = document.getElementById('goes-img-tpw');
   const goesTimeTpw = document.getElementById('goes-time-tpw');
-  if (!goesImgHi || !goesImgTpw || !goesTimeHi || !goesTimeTpw) return;
+  const goesImgPhmo = document.getElementById('goes-img-phmo');
+  const goesTimePhmo = document.getElementById('goes-time-phmo');
+  if (!goesImgHi || !goesImgTpw || !goesTimeHi || !goesTimeTpw || !goesImgPhmo || !goesTimePhmo) return;
 
   try {
     const urls = await fetchGoesAirmassUrl();
     const ts = Date.now();
     const timeStr = `· ${new Date().toLocaleTimeString('en-US', { timeZone: 'Pacific/Honolulu', hour: 'numeric', minute: '2-digit' })} HST`;
+
+    // PHMO Radar Loop
+    goesImgPhmo.src = `https://radar.weather.gov/ridge/standard/PHMO_loop.gif?t=${ts}`;
+    goesTimePhmo.textContent = timeStr;
+
+    // Setup markers for phmo
+    if (goesImgPhmo._updateMarkersRef) {
+      window.removeEventListener('resize', goesImgPhmo._updateMarkersRef);
+      goesImgPhmo.removeEventListener('load', goesImgPhmo._updateMarkersRef);
+    }
+    goesImgPhmo._updateMarkersRef = () => updateMarkers('phmo');
+    goesImgPhmo.addEventListener('load', goesImgPhmo._updateMarkersRef);
+    window.addEventListener('resize', goesImgPhmo._updateMarkersRef);
+    if (goesImgPhmo.complete && goesImgPhmo.naturalWidth > 0) updateMarkers('phmo');
 
     if (urls.hi) {
       goesImgHi.src = `${urls.hi}${urls.hi.includes('?') ? '&' : '?'}t=${ts}`;
@@ -793,8 +829,11 @@ function updateMarkers(sector) {
   let dotLeft, dotTop;
   if (sector === 'hi') {
     dotLeft = 0.278; dotTop = 0.485;
-  } else {
+  } else if (sector === 'tpw') {
     dotLeft = 0.263; dotTop = 0.356;
+  } else if (sector === 'phmo') {
+    // We want the dot to appear "just below the first 'u' in Honolulu"
+    dotLeft = 0.36; dotTop = 0.61;
   }
 
   const markerLayer = document.getElementById(`goes-marker-layer-${sector}`);
