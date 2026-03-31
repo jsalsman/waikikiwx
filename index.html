@@ -607,7 +607,7 @@ function renderTables(data) {
 
 let goesOverlayTimer = null;
 let goesSectorIndex = 0;
-const GOES_SECTOR_ORDER = ['hi', 'tpw'];
+const GOES_SECTOR_ORDER = ['tpw', 'hi'];
 const GOES_SECTOR_LABELS = {
   hi: 'Hawaii',
   tpw: 'Tropical Pacific West',
@@ -636,9 +636,9 @@ function attachGoesOverlay(parent) {
       refreshGoesImage();
       goesOverlayTimer = setTimeout(() => {
         parent.classList.remove('show-gif');
-        goesOverlayTimer = setTimeout(cycleOverlay, 5000); // 5s off
-      }, 5000); // 5s on (second gif)
-    }, 5000); // 5s on (first gif)
+        goesOverlayTimer = setTimeout(cycleOverlay, 4000); // 4s off
+      }, 6000); // 6s on (second gif)
+    }, 6000); // 6s on (first gif)
   }
 
   cycleOverlay();
