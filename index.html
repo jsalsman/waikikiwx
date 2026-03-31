@@ -193,7 +193,7 @@ html, body {
   object-fit: cover; z-index: 9999; opacity: 0; transition: opacity 0.5s;
   pointer-events: none;
 }
-.gif-swap-zone.show-gif .goes-overlay { opacity: 0.7; }
+.gif-swap-zone.show-gif .goes-overlay { opacity: 0.9; }
 .gif-swap-zone.show-gif .block { background: transparent !important; }
 .goes-wrap {
   z-index: 9999;
@@ -392,7 +392,7 @@ thead tr th { border-top: none; }
         <img class="loc-icon" id="loc-icon" alt="Current weather icon">
         <div class="loc">WAIKIKI</div>
       </div>
-      <div class="coords">21.31°N · 157.86°W · 48hr forecast</div>
+      <div class="coords">21.31°N 157.86°W · 48 HOUR forecast</div>
     </div>
     <div class="now-wrap">
       <div class="now-grid">
@@ -429,15 +429,15 @@ thead tr th { border-top: none; }
     <div class="tbl-col" id="tbl-col"></div>
     <div class="charts-col">
       <div class="chart-panel">
-        <div class="sec-lbl">Temperature <span style="font-size: 0.8em; opacity: 0.7; margin-left: 0.5em; font-style: italic;">(°F; dashed: apparent)</span></div>
+        <div class="sec-lbl">Temperature <span style="font-size: 0.8em; opacity: 0.7; margin-left: 0.5em; text-transform: lowercase; font-style: italic;">(dashed: apparent)</span></div>
         <svg id="cTemp" style="width:100%; height:100%;"></svg>
       </div>
       <div class="chart-panel">
-        <div class="sec-lbl">Precipitation <span style="font-size: 0.8em; opacity: 0.7; margin-left: 0.5em; font-style: italic;">(% chance; dashed: inches)</span></div>
+        <div class="sec-lbl">Precipitation <span style="font-size: 0.8em; opacity: 0.7; margin-left: 0.5em; text-transform: lowercase; font-style: italic;">(% and inches)</span></div>
         <svg id="cPrecip" style="width:100%; height:100%;"></svg>
       </div>
       <div class="chart-panel">
-        <div class="sec-lbl">Wind Speed <span style="font-size: 0.8em; opacity: 0.7; margin-left: 0.5em; font-style: italic;">(MPH; dashed: gusts)</span></div>
+        <div class="sec-lbl">Wind Speed <span style="font-size: 0.8em; opacity: 0.7; margin-left: 0.5em; text-transform: lowercase; font-style: italic;">(dashed: gust)</span></div>
         <svg id="cWind" style="width:100%; height:100%;"></svg>
       </div>
     </div>
@@ -719,14 +719,14 @@ async function refreshGoesImage() {
       let dotLeft, dotTop;
 
       if (currentSector === 'hi') {
-        circleLeft = 0.210; circleTop = 0.635;
-        circleDiamX = 0.0867; circleDiamY = 0.0867;
-        dotLeft = 0.210; dotTop = 0.635; // dot centered with circle
+        circleLeft = 0.264; circleTop = 0.428;
+        circleDiamX = 0.4335; circleDiamY = 0.4335;
+        dotLeft = 0.264; dotTop = 0.428; // dot centered with circle
       } else {
         // tpw
-        circleLeft = 0.2222; circleTop = 0.6481;
-        circleDiamX = 0.0578; circleDiamY = 0.0963;
-        dotLeft = 0.2222; dotTop = 0.6481; // dot centered with circle
+        circleLeft = 0.340; circleTop = 0.500;
+        circleDiamX = 0.0867; circleDiamY = 0.14445;
+        dotLeft = 0.340; dotTop = 0.500; // dot centered with circle
       }
 
       goesCircle.style.left = `${offsetX + circleLeft * renderWidth}px`;
@@ -850,7 +850,7 @@ function drawChart(id, W, H, data, defaultMn, defaultMx, opts = {}) {
     svgTxt(svg, tick, PL - 8, y + 4, 11, '#9bb7d3', 'end');
   });
 
-  // Secondary Y-axis for inches of precipitation
+  // Optional: Draw Secondary Y-axis for textData (e.g. inches)
   if (opts.textData && opts.rightAxisMax !== undefined) {
     const rMax = opts.rightAxisMax;
     // We'll just draw a few fixed ticks on the right side
@@ -858,7 +858,7 @@ function drawChart(id, W, H, data, defaultMn, defaultMx, opts = {}) {
     rTicks.forEach(tick => {
       // mapping tick to pixel height
       const y = PT + cH - (tick / (rMax || 1)) * cH;
-      svgTxt(svg, tick.toFixed(1), W - PR + 4, y + 4, 11, '#9bb7d3', 'start');
+      svgTxt(svg, tick.toFixed(2), W - PR + 4, y + 4, 11, '#9bb7d3', 'start');
     });
   }
 
