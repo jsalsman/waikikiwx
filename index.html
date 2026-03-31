@@ -229,12 +229,45 @@ html, body {
   flex: 1;
   min-height: 0;
   width: 100%;
+  justify-content: center;
 }
 .goes-img-wrap img {
   width: 100%;
   height: 100%;
   object-fit: contain;
   border: 1px solid var(--border);
+}
+
+/* Color Key */
+.color-key-container {
+  display: none;
+  flex-direction: column;
+  width: 32%; /* Matches width ratio so image + key = tpw width */
+  height: 100%;
+  border: 1px solid var(--border);
+  border-left: none;
+  font-family: var(--display);
+  font-size: 1.6vmin;
+  letter-spacing: 0.05em;
+}
+
+.gif-swap-zone.show-gif.sector-hi .goes-img-wrap img {
+  width: 68%; /* Rest of the width */
+}
+
+.gif-swap-zone.show-gif.sector-hi .color-key-container {
+  display: flex;
+}
+
+.color-key-block {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 4%;
+  line-height: 1.1;
+  word-break: break-word;
 }
 .goes-marker-layer {
   position: absolute;
@@ -365,6 +398,7 @@ thead tr th { border-top: none; }
   .chart-panel { min-height: 15vh; }
   .block { min-height: auto; flex: none; }
   .gif-swap-zone { padding-bottom: 25vh; }
+  .color-key-container { font-size: 2.2vmin; }
   .ftr { min-height: 3.4em; flex-wrap: wrap; height: auto; }
   .site-id { margin-bottom: 0.2em; }
   .now-summary { margin-bottom: 0.2em; }
@@ -621,6 +655,24 @@ function attachGoesOverlay(parent) {
       <div class="goes-title" id="goes-title">GOES West Air Mass <span class="goes-time" id="goes-time">loading…</span></div>
       <div class="goes-img-wrap">
         <img id="goes-img" alt="Latest GOES West Hawaii Air Mass animation">
+        <div class="color-key-container" id="color-key-container">
+          <!-- 1. Jet stream / dry upper level (dark red/orange) -->
+          <div class="color-key-block" style="background: #b52007; color: #ffffff;">JET STREAM / DRY UPPER LEVEL</div>
+          <!-- 2. Cold air mass (dark blue/purple) -->
+          <div class="color-key-block" style="background: #0a0a8c; color: #ffffff;">COLD AIR MASS</div>
+          <!-- 3. Warm air mass (green) -->
+          <div class="color-key-block" style="background: #6a6e36; color: #ffffff;">WARM AIR MASS</div>
+          <!-- 4. Warm air mass, less moisture (dark orange) -->
+          <div class="color-key-block" style="background: #714C05; color: #ffffff;">WARM AIR MASS, LESS MOISTURE</div>
+          <!-- 5. High thick cloud (white) -->
+          <div class="color-key-block" style="background: #ffffff; color: #000000;">HIGH THICK CLOUD</div>
+          <!-- 6. Mid level cloud (tan/salmon) -->
+          <div class="color-key-block" style="background: #b5744f; color: #ffffff;">MID LEVEL CLOUD</div>
+          <!-- 7. Low level cloud (green, dark blue) -->
+          <div class="color-key-block" style="background: #365B2D; color: #ffffff;">LOW LEVEL CLOUD</div>
+          <!-- 8. Limb effects (purple/blue) -->
+          <div class="color-key-block" style="background: #6e008c; color: #ffffff;">LIMB EFFECTS</div>
+        </div>
         <div class="goes-marker-layer" id="goes-marker-layer">
           <div class="goes-dot" id="goes-dot"></div>
         </div>
@@ -673,6 +725,17 @@ async function refreshGoesImage() {
     const url = urls[currentSector];
     if (!url) throw new Error(`Missing GOES URL for sector ${currentSector}`);
     goesImg.src = `${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}`;
+
+    // Toggle the sector-hi class for the color key visibility
+    const swapZone = goesImg.closest('.gif-swap-zone');
+    if (swapZone) {
+      if (currentSector === 'hi') {
+        swapZone.classList.add('sector-hi');
+      } else {
+        swapZone.classList.remove('sector-hi');
+      }
+    }
+
     const sectorLabel = GOES_SECTOR_LABELS[currentSector] || currentSector.toUpperCase();
     goesTitle.childNodes[0].textContent = `GOES West ${sectorLabel} Air Mass `;
     goesTime.textContent = `· ${new Date().toLocaleTimeString('en-US', { timeZone: 'Pacific/Honolulu', hour: 'numeric', minute: '2-digit' })} HST`;
@@ -689,22 +752,24 @@ async function refreshGoesImage() {
     // not just the 100% width/height container, to ensure markers are
     // perfectly aligned regardless of aspect ratio.
     function updateMarkers() {
-      const containerRect = goesImg.parentElement.getBoundingClientRect();
+      const imgRect = goesImg.getBoundingClientRect();
+      const wrapperRect = goesImg.parentElement.getBoundingClientRect();
       const imgRatio = goesImg.naturalWidth / goesImg.naturalHeight;
-      const containerRatio = containerRect.width / containerRect.height;
-      let renderWidth = containerRect.width;
-      let renderHeight = containerRect.height;
-      let offsetX = 0;
-      let offsetY = 0;
+      const containerRatio = imgRect.width / imgRect.height;
+
+      let renderWidth = imgRect.width;
+      let renderHeight = imgRect.height;
+      let offsetX = imgRect.left - wrapperRect.left;
+      let offsetY = imgRect.top - wrapperRect.top;
 
       if (imgRatio > containerRatio) {
         // Image is wider than container ratio, so it's letterboxed (black bars top/bottom)
-        renderHeight = containerRect.width / imgRatio;
-        offsetY = (containerRect.height - renderHeight) / 2;
+        renderHeight = imgRect.width / imgRatio;
+        offsetY += (imgRect.height - renderHeight) / 2;
       } else {
         // Image is taller than container ratio, so it's pillarboxed (black bars left/right)
-        renderWidth = containerRect.height * imgRatio;
-        offsetX = (containerRect.width - renderWidth) / 2;
+        renderWidth = imgRect.height * imgRatio;
+        offsetX += (imgRect.width - renderWidth) / 2;
       }
 
       let dotLeft, dotTop;
