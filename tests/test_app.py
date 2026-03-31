@@ -184,7 +184,7 @@ class AppTestCase(unittest.TestCase):
                     'startTime': '2026-03-28T19:00:00-10:00',
                     'windDirection': 'NE',
                     'windSpeed': '25 mph',
-                    'temperature': 55,
+                    'temperature': 75,
                     'probabilityOfPrecipitation': {'value': 0},
                     'icon': 'icon.png',
                     'shortForecast': 'Cloudy'
@@ -193,12 +193,17 @@ class AppTestCase(unittest.TestCase):
         }
         mock_grid_resp = MagicMock()
         mock_grid_resp.status_code = 200
-        # 55 F -> 12.78 C
+        # 75 F -> 23.88 C
         mock_grid_resp.json.return_value = {
             'properties': {
                 'apparentTemperature': {
                     'values': [
-                        {'validTime': '2026-03-28T19:00:00-10:00/PT1H', 'value': 12.77777}
+                        {'validTime': '2026-03-28T19:00:00-10:00/PT1H', 'value': 23.8888}
+                    ]
+                },
+                'relativeHumidity': {
+                    'values': [
+                        {'validTime': '2026-03-28T19:00:00-10:00/PT1H', 'value': 50}
                     ]
                 }
             }
@@ -207,8 +212,8 @@ class AppTestCase(unittest.TestCase):
         data = app.scrape_forecast()
 
         apparent = data['apparent_temp'][0]
-        # It should be dropped to ~49
-        self.assertEqual(apparent, 49)
+        # At 75F, 50% RH, and 25mph wind, the Australian AT is ~62.3F (62F)
+        self.assertEqual(apparent, 62)
 
 if __name__ == '__main__':
     unittest.main()

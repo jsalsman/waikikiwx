@@ -34,6 +34,7 @@ def get_forecast_urls():
     return _forecast_hourly_url, _forecast_grid_data_url
 
 import datetime
+import math
 
 WIND_SPEED_RE = re.compile(r'\d+')
 def parse_wind_speed(s):
@@ -129,6 +130,10 @@ def scrape_forecast():
     def mm_to_in(mm): return round(mm / 25.4, 2)
     precip_in = map_grid_series_to_hourly(raw_qpf, hourly_dts, converter=mm_to_in)
 
+    raw_rh = grid_props.get('relativeHumidity', {}).get('values', [])
+    # no conversion needed for RH %
+    rh_hourly = map_grid_series_to_hourly(raw_rh, hourly_dts)
+
     # In case there's no gust data or missing values, we'll fill None with speed
     speed = [parse_wind_speed(p['windSpeed']) for p in periods]
     for i in range(len(wind_gust)):
@@ -142,14 +147,20 @@ def scrape_forecast():
         if apparent_temp[i] is None:
             apparent_temp[i] = temp[i]
 
-        # Custom wind chill adjustment for apparent temp between 50F and 80F
-        t = apparent_temp[i]
-        v = speed[i]
-        if 50 <= t <= 80 and v > 3:
-            # Standard NWS wind chill formula applied to higher temps
-            wc = 35.74 + (0.6215 * t) - (35.75 * (v**0.16)) + (0.4275 * t * (v**0.16))
-            if wc < t:
-                apparent_temp[i] = round(wc)
+        # Custom apparent temperature adjustment using Australian Apparent Temperature
+        t_f = apparent_temp[i]
+        v_mph = speed[i]
+        rh = rh_hourly[i] if rh_hourly and i < len(rh_hourly) and rh_hourly[i] is not None else 50
+
+        if 50 <= t_f <= 80 and v_mph > 0:
+            t_c = (t_f - 32) * 5 / 9
+            v_ms = v_mph * 0.44704
+            e = (rh / 100) * 6.105 * math.exp((17.27 * t_c) / (237.7 + t_c))
+            at_c = t_c + (0.33 * e) - (0.70 * v_ms) - 4.00
+            at_f = (at_c * 9 / 5) + 32
+
+            if at_f < t_f:
+                apparent_temp[i] = round(at_f)
 
     for i in range(len(precip_in)):
         if precip_in[i] is None:
