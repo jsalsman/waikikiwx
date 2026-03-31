@@ -190,12 +190,13 @@ html, body {
 .gif-swap-zone { position: relative; display: flex; flex-direction: column; flex: 3; min-height: 0; }
 .goes-overlay {
   position: absolute; top: 5px; left: 0; width: 100%; height: 100%;
-  object-fit: cover; z-index: 0; opacity: 0; transition: opacity 0.5s;
+  object-fit: cover; z-index: 9999; opacity: 0; transition: opacity 0.5s;
   pointer-events: none;
 }
 .gif-swap-zone.show-gif .goes-overlay { opacity: 0.7; }
 .gif-swap-zone.show-gif .block { background: transparent !important; }
 .goes-wrap {
+  z-index: 9999;
   width: 100%;
   height: 100%;
   padding: 1.5%;
@@ -218,6 +219,50 @@ html, body {
   flex: 1;
   object-fit: contain;
   border: 1px solid var(--border);
+  position: relative;
+}
+
+/* Markers Overlay Container */
+.goes-img-wrap {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+.goes-img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border: 1px solid var(--border);
+}
+.goes-marker-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.show-gif .goes-marker-layer {
+  opacity: 1;
+}
+.goes-circle {
+  position: absolute;
+  border: 2px solid magenta;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 8px rgba(255, 0, 255, 0.4);
+}
+.goes-dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #00c8ff;
+  transform: translate(-50%, -50%) rotate(45deg);
+  box-shadow: 0 0 6px #00c8ff;
 }
 .blk-lbl {
   flex-shrink: 0;
@@ -580,7 +625,13 @@ function attachGoesOverlay(parent) {
   overlay.innerHTML = `
     <div class="goes-wrap">
       <div class="goes-title" id="goes-title">GOES West Air Mass <span class="goes-time" id="goes-time">loading…</span></div>
-      <img id="goes-img" alt="Latest GOES West Hawaii Air Mass animation">
+      <div class="goes-img-wrap">
+        <img id="goes-img" alt="Latest GOES West Hawaii Air Mass animation">
+        <div class="goes-marker-layer" id="goes-marker-layer">
+          <div class="goes-circle" id="goes-circle"></div>
+          <div class="goes-dot" id="goes-dot"></div>
+        </div>
+      </div>
     </div>`;
   parent.appendChild(overlay);
   clearTimeout(goesOverlayTimer);
@@ -621,6 +672,9 @@ async function refreshGoesImage() {
   const goesTime = document.getElementById('goes-time');
   const goesTitle = document.getElementById('goes-title');
   if (!goesImg || !goesTime || !goesTitle) return;
+  const goesCircle = document.getElementById('goes-circle');
+  const goesDot = document.getElementById('goes-dot');
+  if (!goesImg || !goesTime || !goesTitle || !goesCircle || !goesDot) return;
   try {
     const urls = await fetchGoesAirmassUrl();
     const currentSector = GOES_SECTOR_ORDER[goesSectorIndex % GOES_SECTOR_ORDER.length];
@@ -631,6 +685,68 @@ async function refreshGoesImage() {
     goesTitle.childNodes[0].textContent = `GOES West ${sectorLabel} Air Mass `;
     goesTime.textContent = `· ${new Date().toLocaleTimeString('en-US', { timeZone: 'Pacific/Honolulu', hour: 'numeric', minute: '2-digit' })} HST`;
     goesSectorIndex += 1;
+
+    // Ensure previous event listeners are removed to prevent memory leaks
+    if (goesImg._updateMarkersRef) {
+      window.removeEventListener('resize', goesImg._updateMarkersRef);
+      goesImg.removeEventListener('load', goesImg._updateMarkersRef);
+    }
+
+    // The image itself is scaled with `object-fit: contain`. We must position
+    // the markers relative to the image's *rendered* intrinsic bounds,
+    // not just the 100% width/height container, to ensure markers are
+    // perfectly aligned regardless of aspect ratio.
+    function updateMarkers() {
+      const containerRect = goesImg.parentElement.getBoundingClientRect();
+      const imgRatio = goesImg.naturalWidth / goesImg.naturalHeight;
+      const containerRatio = containerRect.width / containerRect.height;
+      let renderWidth = containerRect.width;
+      let renderHeight = containerRect.height;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      if (imgRatio > containerRatio) {
+        // Image is wider than container ratio, so it's letterboxed (black bars top/bottom)
+        renderHeight = containerRect.width / imgRatio;
+        offsetY = (containerRect.height - renderHeight) / 2;
+      } else {
+        // Image is taller than container ratio, so it's pillarboxed (black bars left/right)
+        renderWidth = containerRect.height * imgRatio;
+        offsetX = (containerRect.width - renderWidth) / 2;
+      }
+
+      let circleLeft, circleTop, circleDiamX, circleDiamY;
+      let dotLeft, dotTop;
+
+      if (currentSector === 'hi') {
+        circleLeft = 0.210; circleTop = 0.635;
+        circleDiamX = 0.0867; circleDiamY = 0.0867;
+        dotLeft = 0.210; dotTop = 0.635; // dot centered with circle
+      } else {
+        // tpw
+        circleLeft = 0.2222; circleTop = 0.6481;
+        circleDiamX = 0.0578; circleDiamY = 0.0963;
+        dotLeft = 0.2222; dotTop = 0.6481; // dot centered with circle
+      }
+
+      goesCircle.style.left = `${offsetX + circleLeft * renderWidth}px`;
+      goesCircle.style.top = `${offsetY + circleTop * renderHeight}px`;
+      goesCircle.style.width = `${circleDiamX * renderWidth}px`;
+      goesCircle.style.height = `${circleDiamY * renderHeight}px`;
+
+      goesDot.style.left = `${offsetX + dotLeft * renderWidth}px`;
+      goesDot.style.top = `${offsetY + dotTop * renderHeight}px`;
+    }
+
+    goesImg._updateMarkersRef = updateMarkers;
+    goesImg.addEventListener('load', updateMarkers);
+    window.addEventListener('resize', updateMarkers);
+
+    // Call updateMarkers immediately if the image is already loaded (cached)
+    if (goesImg.complete && goesImg.naturalWidth > 0) {
+      updateMarkers();
+    }
+
   } catch (err) {
     console.error('[goes] fetch failed:', err);
     goesTime.textContent = '· unavailable';
