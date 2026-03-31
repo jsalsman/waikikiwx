@@ -1057,7 +1057,8 @@ function renderAll(data) {
     const locIconEl = document.getElementById('loc-icon');
     const faviconEl = document.querySelector('link[rel="icon"]');
     
-    const proxyUrl = `/icon?url=${encodeURIComponent(nowIcon)}`;
+    const ts = Date.now();
+    const proxyUrl = `/icon?url=${encodeURIComponent(nowIcon)}&t=${ts}`;
     locIconEl.src = proxyUrl;
     
     if (faviconEl) {
