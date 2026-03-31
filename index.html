@@ -249,13 +249,6 @@ html, body {
 .show-gif .goes-marker-layer {
   opacity: 1;
 }
-.goes-circle {
-  position: absolute;
-  border: 2px solid magenta;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  box-shadow: 0 0 8px rgba(255, 0, 255, 0.4);
-}
 .goes-dot {
   position: absolute;
   width: 6px;
@@ -628,7 +621,6 @@ function attachGoesOverlay(parent) {
       <div class="goes-img-wrap">
         <img id="goes-img" alt="Latest GOES West Hawaii Air Mass animation">
         <div class="goes-marker-layer" id="goes-marker-layer">
-          <div class="goes-circle" id="goes-circle"></div>
           <div class="goes-dot" id="goes-dot"></div>
         </div>
       </div>
@@ -672,9 +664,8 @@ async function refreshGoesImage() {
   const goesTime = document.getElementById('goes-time');
   const goesTitle = document.getElementById('goes-title');
   if (!goesImg || !goesTime || !goesTitle) return;
-  const goesCircle = document.getElementById('goes-circle');
   const goesDot = document.getElementById('goes-dot');
-  if (!goesImg || !goesTime || !goesTitle || !goesCircle || !goesDot) return;
+  if (!goesImg || !goesTime || !goesTitle || !goesDot) return;
   try {
     const urls = await fetchGoesAirmassUrl();
     const currentSector = GOES_SECTOR_ORDER[goesSectorIndex % GOES_SECTOR_ORDER.length];
@@ -715,24 +706,14 @@ async function refreshGoesImage() {
         offsetX = (containerRect.width - renderWidth) / 2;
       }
 
-      let circleLeft, circleTop, circleDiamX, circleDiamY;
       let dotLeft, dotTop;
 
       if (currentSector === 'hi') {
-        circleLeft = 0.264; circleTop = 0.428;
-        circleDiamX = 0.4335; circleDiamY = 0.4335;
-        dotLeft = 0.264; dotTop = 0.428; // dot centered with circle
+        dotLeft = 0.268; dotTop = 0.435;
       } else {
         // tpw
-        circleLeft = 0.340; circleTop = 0.500;
-        circleDiamX = 0.0867; circleDiamY = 0.14445;
-        dotLeft = 0.340; dotTop = 0.500; // dot centered with circle
+        dotLeft = 0.313; dotTop = 0.256;
       }
-
-      goesCircle.style.left = `${offsetX + circleLeft * renderWidth}px`;
-      goesCircle.style.top = `${offsetY + circleTop * renderHeight}px`;
-      goesCircle.style.width = `${circleDiamX * renderWidth}px`;
-      goesCircle.style.height = `${circleDiamY * renderHeight}px`;
 
       goesDot.style.left = `${offsetX + dotLeft * renderWidth}px`;
       goesDot.style.top = `${offsetY + dotTop * renderHeight}px`;
