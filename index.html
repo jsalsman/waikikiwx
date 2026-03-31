@@ -772,6 +772,15 @@ function drawChart(id, W, H, data, defaultMn, defaultMx, opts = {}) {
     });
   }
 
+  // Draw Weekday labels
+  if (opts.weekdayLabels) {
+    opts.weekdayLabels.forEach((lbl, i) => {
+      if (lbl) {
+        svgTxt(svg, lbl, xp(i), 12, 10, '#9bb7d3');
+      }
+    });
+  }
+
   // Draw Data
   if (opts.bars) {
     const bW = (cW / N) * 0.7;
@@ -860,6 +869,23 @@ function renderAll(data) {
   );
   const dayChangeIndices = [];
   data.hour.forEach((h, i) => { if (i > 0 && h === 0) dayChangeIndices.push(i); });
+
+  // Create weekday labels at 12P (noon)
+  const hstNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Pacific/Honolulu' }));
+  let currentDayCursor = new Date(hstNow);
+  currentDayCursor.setHours(data.hour[0], 0, 0, 0);
+
+  const weekdayLabels = new Array(data.hour.length).fill(null);
+  data.hour.forEach((h, i) => {
+    if (i > 0 && h === 0) {
+      currentDayCursor.setDate(currentDayCursor.getDate() + 1);
+    }
+    if (h === 12) {
+      const dayAbbrev = DAYS[currentDayCursor.getDay()];
+      weekdayLabels[i] = dayAbbrev.charAt(0) + dayAbbrev.slice(1).toLowerCase();
+    }
+  });
+
   const cW = document.getElementById('cTemp').clientWidth || 260;
   const cH = document.getElementById('cTemp').clientHeight || 78;
 
@@ -870,7 +896,7 @@ function renderAll(data) {
   const offsetGust = data.gust.map((v, i) => v === data.speed[i] ? v + 0.3 : v);
 
   drawChart('cTemp',   cW, cH, data.temp,   55, 85,
-    { lineColor:'#ff6b35', areaColor:'rgba(255,107,53,0.08)', overlayData: offsetApparent, overlayColor: '#ffaa88', xLabels, dayChangeIndices });
+    { lineColor:'#ff6b35', areaColor:'rgba(255,107,53,0.08)', overlayData: offsetApparent, overlayColor: '#ffaa88', xLabels, weekdayLabels, dayChangeIndices });
 
   // Calculate precip_in max for right axis scale
   let maxPrecipIn = Math.max(...data.precip_in, 0.5); // Fallback to 0.5 inches if all 0
@@ -878,10 +904,10 @@ function renderAll(data) {
   else maxPrecipIn = Math.ceil(maxPrecipIn); // e.g. 1.2 -> 2.0
 
   drawChart('cPrecip', cW, cH, data.precip,  0, 100,
-    { bars:true, textData: data.precip_in, rightAxisMax: maxPrecipIn, xLabels, dayChangeIndices });
+    { bars:true, textData: data.precip_in, rightAxisMax: maxPrecipIn, xLabels, weekdayLabels, dayChangeIndices });
 
   drawChart('cWind',   cW, cH, data.speed,   0,  40,
-    { lineColor:'#39d98a', areaColor:'rgba(57,217,138,0.07)', overlayData: offsetGust, overlayColor: '#88ffbb', warnAt:35, xLabels, dayChangeIndices });
+    { lineColor:'#39d98a', areaColor:'rgba(57,217,138,0.07)', overlayData: offsetGust, overlayColor: '#88ffbb', warnAt:35, xLabels, weekdayLabels, dayChangeIndices });
 }
 
 let currentData = null;
