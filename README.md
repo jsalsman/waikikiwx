@@ -9,6 +9,8 @@ Single-page live 48-hour weather forecast dashboard for Waikiki, Honolulu, Oahu,
 [![MIT License](https://img.shields.io/badge/License-MIT-brightgreen)](https://opensource.org/licenses/MIT)
 [![Donate](https://img.shields.io/badge/Donate-gold?logo=paypal)](https://paypal.me/jsalsman)
 
+URL: https://WaikikiWX.live
+
 ![Screenshot of the project](screenshot.png)
 
 ## What is shown
