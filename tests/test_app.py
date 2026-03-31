@@ -109,5 +109,111 @@ class AppTestCase(unittest.TestCase):
         response = self.client.get('/icon?url=https://example.com/icon.png')
         self.assertEqual(response.status_code, 403)
 
+    @patch('app.get_forecast_urls')
+    @patch('app.requests.get')
+    def test_scrape_forecast_custom_wind_chill(self, mock_get, mock_get_forecast_urls):
+        mock_get_forecast_urls.return_value = ('http://hourly', 'http://grid')
+
+        # We need two responses: one for hourly, one for grid
+        mock_hourly_resp = MagicMock()
+        mock_hourly_resp.status_code = 200
+        mock_hourly_resp.json.return_value = {
+            'properties': {
+                'periods': [
+                    {
+                        'startTime': '2026-03-28T19:00:00-10:00',
+                        'windDirection': 'NE',
+                        'windSpeed': '20 mph',
+                        'temperature': 70,
+                        'probabilityOfPrecipitation': {'value': 0},
+                        'icon': 'icon.png',
+                        'shortForecast': 'Sunny'
+                    },
+                    {
+                        'startTime': '2026-03-28T20:00:00-10:00',
+                        'windDirection': 'E',
+                        'windSpeed': '5 mph',
+                        'temperature': 85, # Too warm for adjustment
+                        'probabilityOfPrecipitation': {'value': 0},
+                        'icon': 'icon.png',
+                        'shortForecast': 'Sunny'
+                    },
+                    {
+                        'startTime': '2026-03-28T21:00:00-10:00',
+                        'windDirection': 'E',
+                        'windSpeed': '0 mph', # No wind
+                        'temperature': 65,
+                        'probabilityOfPrecipitation': {'value': 0},
+                        'icon': 'icon.png',
+                        'shortForecast': 'Sunny'
+                    }
+                ]
+            }
+        }
+
+        mock_grid_resp = MagicMock()
+        mock_grid_resp.status_code = 200
+        # For apparentTemperature: 21.11C = 70F, 29.44C = 85F, 18.33C = 65F
+        mock_grid_resp.json.return_value = {
+            'properties': {
+                'apparentTemperature': {
+                    'values': [
+                        {'validTime': '2026-03-28T19:00:00-10:00/PT1H', 'value': 21.11},
+                        {'validTime': '2026-03-28T20:00:00-10:00/PT1H', 'value': 29.44},
+                        {'validTime': '2026-03-28T21:00:00-10:00/PT1H', 'value': 18.33}
+                    ]
+                }
+            }
+        }
+
+        mock_get.side_effect = [mock_hourly_resp, mock_grid_resp]
+
+        data = app.scrape_forecast()
+
+        self.assertEqual(len(data['apparent_temp']), 3)
+
+    @patch('app.get_forecast_urls')
+    @patch('app.requests.get')
+    def test_wind_chill_drops_temp(self, mock_get, mock_get_forecast_urls):
+        mock_get_forecast_urls.return_value = ('http://hourly', 'http://grid')
+        mock_hourly_resp = MagicMock()
+        mock_hourly_resp.status_code = 200
+        mock_hourly_resp.json.return_value = {
+            'properties': {
+                'periods': [{
+                    'startTime': '2026-03-28T19:00:00-10:00',
+                    'windDirection': 'NE',
+                    'windSpeed': '25 mph',
+                    'temperature': 75,
+                    'probabilityOfPrecipitation': {'value': 0},
+                    'icon': 'icon.png',
+                    'shortForecast': 'Cloudy'
+                }]
+            }
+        }
+        mock_grid_resp = MagicMock()
+        mock_grid_resp.status_code = 200
+        # 75 F -> 23.88 C
+        mock_grid_resp.json.return_value = {
+            'properties': {
+                'apparentTemperature': {
+                    'values': [
+                        {'validTime': '2026-03-28T19:00:00-10:00/PT1H', 'value': 23.8888}
+                    ]
+                },
+                'relativeHumidity': {
+                    'values': [
+                        {'validTime': '2026-03-28T19:00:00-10:00/PT1H', 'value': 50}
+                    ]
+                }
+            }
+        }
+        mock_get.side_effect = [mock_hourly_resp, mock_grid_resp]
+        data = app.scrape_forecast()
+
+        apparent = data['apparent_temp'][0]
+        # At 75F, 50% RH, and 25mph wind, the Australian AT is ~62.3F (62F)
+        self.assertEqual(apparent, 62)
+
 if __name__ == '__main__':
     unittest.main()
