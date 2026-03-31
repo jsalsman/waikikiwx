@@ -193,8 +193,9 @@ html, body {
   object-fit: cover; z-index: 9999; opacity: 0; transition: opacity 0.5s;
   pointer-events: none;
 }
-.gif-swap-zone.show-gif .goes-overlay { opacity: 0.9; }
-.gif-swap-zone.show-gif .block { background: transparent !important; }
+.gif-swap-zone.show-tpw .goes-overlay.tpw-overlay { opacity: 0.9; }
+.gif-swap-zone.show-hi .goes-overlay.hi-overlay { opacity: 0.9; }
+.gif-swap-zone.show-tpw .block, .gif-swap-zone.show-hi .block { background: transparent !important; }
 .goes-wrap {
   z-index: 9999;
   width: 100%;
@@ -240,7 +241,7 @@ html, body {
 
 /* Color Key */
 .color-key-container {
-  display: none;
+  display: flex;
   flex-direction: column;
   width: 32%; /* Matches width ratio so image + key = tpw width */
   height: 100%;
@@ -251,12 +252,8 @@ html, body {
   letter-spacing: 0.05em;
 }
 
-.gif-swap-zone.show-gif.sector-hi .goes-img-wrap img {
+.hi-overlay .goes-img-wrap img {
   width: 68%; /* Rest of the width */
-}
-
-.gif-swap-zone.show-gif.sector-hi .color-key-container {
-  display: flex;
 }
 
 .color-key-block {
@@ -279,7 +276,8 @@ html, body {
   opacity: 0;
   transition: opacity 0.3s;
 }
-.show-gif .goes-marker-layer {
+.show-tpw .goes-marker-layer.tpw-marker-layer,
+.show-hi .goes-marker-layer.hi-marker-layer {
   opacity: 1;
 }
 .goes-dot {
@@ -640,57 +638,64 @@ function renderTables(data) {
 }
 
 let goesOverlayTimer = null;
-let goesSectorIndex = 0;
-const GOES_SECTOR_ORDER = ['tpw', 'hi'];
 const GOES_SECTOR_LABELS = {
   hi: 'Hawaii',
   tpw: 'Tropical Pacific West',
 };
 
 function attachGoesOverlay(parent) {
-  const overlay = document.createElement('div');
-  overlay.className = 'goes-overlay';
-  overlay.innerHTML = `
+  const overlayHi = document.createElement('div');
+  overlayHi.className = 'goes-overlay hi-overlay';
+  overlayHi.innerHTML = `
     <div class="goes-wrap">
-      <div class="goes-title" id="goes-title">GOES West Air Mass <span class="goes-time" id="goes-time">loading…</span></div>
+      <div class="goes-title" id="goes-title-hi">GOES West Hawaii Air Mass <span class="goes-time" id="goes-time-hi">loading…</span></div>
       <div class="goes-img-wrap">
-        <img id="goes-img" alt="Latest GOES West Hawaii Air Mass animation">
-        <div class="color-key-container" id="color-key-container">
-          <!-- 1. Jet stream / dry upper level (dark red/orange) -->
+        <img id="goes-img-hi" alt="Latest GOES West Hawaii Air Mass animation">
+        <div class="color-key-container">
           <div class="color-key-block" style="background: #b52007; color: #ffffff;">JET STREAM / DRY UPPER LEVEL</div>
-          <!-- 2. Cold air mass (dark blue/purple) -->
           <div class="color-key-block" style="background: #0a0a8c; color: #ffffff;">COLD AIR MASS</div>
-          <!-- 3. Warm air mass (green) -->
           <div class="color-key-block" style="background: #6a6e36; color: #ffffff;">WARM AIR MASS</div>
-          <!-- 4. Warm air mass, less moisture (dark orange) -->
           <div class="color-key-block" style="background: #714C05; color: #ffffff;">WARM AIR MASS, LESS MOISTURE</div>
-          <!-- 5. High thick cloud (white) -->
           <div class="color-key-block" style="background: #ffffff; color: #000000;">HIGH THICK CLOUD</div>
-          <!-- 6. Mid level cloud (tan/salmon) -->
           <div class="color-key-block" style="background: #b5744f; color: #ffffff;">MID LEVEL CLOUD</div>
-          <!-- 7. Low level cloud (green, dark blue) -->
           <div class="color-key-block" style="background: #365B2D; color: #ffffff;">LOW LEVEL CLOUD</div>
-          <!-- 8. Limb effects (purple/blue) -->
           <div class="color-key-block" style="background: #6e008c; color: #ffffff;">LIMB EFFECTS</div>
         </div>
-        <div class="goes-marker-layer" id="goes-marker-layer">
-          <div class="goes-dot" id="goes-dot"></div>
+        <div class="goes-marker-layer hi-marker-layer" id="goes-marker-layer-hi">
+          <div class="goes-dot"></div>
         </div>
       </div>
     </div>`;
-  parent.appendChild(overlay);
+  parent.appendChild(overlayHi);
+
+  const overlayTpw = document.createElement('div');
+  overlayTpw.className = 'goes-overlay tpw-overlay';
+  overlayTpw.innerHTML = `
+    <div class="goes-wrap">
+      <div class="goes-title" id="goes-title-tpw">GOES West Tropical Pacific West Air Mass <span class="goes-time" id="goes-time-tpw">loading…</span></div>
+      <div class="goes-img-wrap">
+        <img id="goes-img-tpw" alt="Latest GOES West Tropical Pacific West Air Mass animation">
+        <div class="goes-marker-layer tpw-marker-layer" id="goes-marker-layer-tpw">
+          <div class="goes-dot"></div>
+        </div>
+      </div>
+    </div>`;
+  parent.appendChild(overlayTpw);
+
   clearTimeout(goesOverlayTimer);
 
+  loadGoesImages();
+
   function cycleOverlay() {
-    refreshGoesImage();
-    parent.classList.add('show-gif');
+    parent.classList.add('show-hi');
     goesOverlayTimer = setTimeout(() => {
-      refreshGoesImage();
+      parent.classList.remove('show-hi');
+      parent.classList.add('show-tpw');
       goesOverlayTimer = setTimeout(() => {
-        parent.classList.remove('show-gif');
+        parent.classList.remove('show-tpw');
         goesOverlayTimer = setTimeout(cycleOverlay, 4000); // 4s off
-      }, 6000); // 6s on (second gif)
-    }, 6000); // 6s on (first gif)
+      }, 6000); // 6s on (tpw gif)
+    }, 6000); // 6s on (hi gif)
   }
 
   cycleOverlay();
@@ -712,99 +717,94 @@ async function fetchGoesAirmassUrl() {
   return data.urls;
 }
 
-async function refreshGoesImage() {
-  const goesImg = document.getElementById('goes-img');
-  const goesTime = document.getElementById('goes-time');
-  const goesTitle = document.getElementById('goes-title');
-  if (!goesImg || !goesTime || !goesTitle) return;
-  const goesDot = document.getElementById('goes-dot');
-  if (!goesImg || !goesTime || !goesTitle || !goesDot) return;
+async function loadGoesImages() {
+  const goesImgHi = document.getElementById('goes-img-hi');
+  const goesTimeHi = document.getElementById('goes-time-hi');
+  const goesImgTpw = document.getElementById('goes-img-tpw');
+  const goesTimeTpw = document.getElementById('goes-time-tpw');
+  if (!goesImgHi || !goesImgTpw || !goesTimeHi || !goesTimeTpw) return;
+
   try {
     const urls = await fetchGoesAirmassUrl();
-    const currentSector = GOES_SECTOR_ORDER[goesSectorIndex % GOES_SECTOR_ORDER.length];
-    const url = urls[currentSector];
-    if (!url) throw new Error(`Missing GOES URL for sector ${currentSector}`);
-    goesImg.src = `${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}`;
+    const ts = Date.now();
+    const timeStr = `· ${new Date().toLocaleTimeString('en-US', { timeZone: 'Pacific/Honolulu', hour: 'numeric', minute: '2-digit' })} HST`;
 
-    // Toggle the sector-hi class for the color key visibility
-    const swapZone = goesImg.closest('.gif-swap-zone');
-    if (swapZone) {
-      if (currentSector === 'hi') {
-        swapZone.classList.add('sector-hi');
-      } else {
-        swapZone.classList.remove('sector-hi');
+    if (urls.hi) {
+      goesImgHi.src = `${urls.hi}${urls.hi.includes('?') ? '&' : '?'}t=${ts}`;
+      goesTimeHi.textContent = timeStr;
+
+      // Setup markers for hi
+      if (goesImgHi._updateMarkersRef) {
+        window.removeEventListener('resize', goesImgHi._updateMarkersRef);
+        goesImgHi.removeEventListener('load', goesImgHi._updateMarkersRef);
       }
+      goesImgHi._updateMarkersRef = () => updateMarkers('hi');
+      goesImgHi.addEventListener('load', goesImgHi._updateMarkersRef);
+      window.addEventListener('resize', goesImgHi._updateMarkersRef);
+      if (goesImgHi.complete && goesImgHi.naturalWidth > 0) updateMarkers('hi');
     }
 
-    const sectorLabel = GOES_SECTOR_LABELS[currentSector] || currentSector.toUpperCase();
-    goesTitle.childNodes[0].textContent = `GOES West ${sectorLabel} Air Mass `;
-    goesTime.textContent = `· ${new Date().toLocaleTimeString('en-US', { timeZone: 'Pacific/Honolulu', hour: 'numeric', minute: '2-digit' })} HST`;
-    goesSectorIndex += 1;
+    if (urls.tpw) {
+      goesImgTpw.src = `${urls.tpw}${urls.tpw.includes('?') ? '&' : '?'}t=${ts}`;
+      goesTimeTpw.textContent = timeStr;
 
-    // Ensure previous event listeners are removed to prevent memory leaks
-    if (goesImg._updateMarkersRef) {
-      window.removeEventListener('resize', goesImg._updateMarkersRef);
-      goesImg.removeEventListener('load', goesImg._updateMarkersRef);
-    }
-
-    // The image itself is scaled with `object-fit: contain`. We must position
-    // the markers relative to the image's *rendered* intrinsic bounds,
-    // not just the 100% width/height container, to ensure markers are
-    // perfectly aligned regardless of aspect ratio.
-    function updateMarkers() {
-      const imgRect = goesImg.getBoundingClientRect();
-      const wrapperRect = goesImg.parentElement.getBoundingClientRect();
-      const imgRatio = goesImg.naturalWidth / goesImg.naturalHeight;
-      const containerRatio = imgRect.width / imgRect.height;
-
-      let renderWidth = imgRect.width;
-      let renderHeight = imgRect.height;
-      let offsetX = imgRect.left - wrapperRect.left;
-      let offsetY = imgRect.top - wrapperRect.top;
-
-      if (imgRatio > containerRatio) {
-        // Image is wider than container ratio, so it's letterboxed (black bars top/bottom)
-        renderHeight = imgRect.width / imgRatio;
-        offsetY += (imgRect.height - renderHeight) / 2;
-      } else {
-        // Image is taller than container ratio, so it's pillarboxed (black bars left/right)
-        renderWidth = imgRect.height * imgRatio;
-        offsetX += (imgRect.width - renderWidth) / 2;
+      // Setup markers for tpw
+      if (goesImgTpw._updateMarkersRef) {
+        window.removeEventListener('resize', goesImgTpw._updateMarkersRef);
+        goesImgTpw.removeEventListener('load', goesImgTpw._updateMarkersRef);
       }
-
-      let dotLeft, dotTop;
-
-      if (currentSector === 'hi') {
-        dotLeft = 0.278; dotTop = 0.485;
-      } else {
-        // tpw
-        dotLeft = 0.263; dotTop = 0.356;
-      }
-
-      const markerLayer = document.getElementById('goes-marker-layer');
-      if (markerLayer) {
-        markerLayer.innerHTML = '';
-        const centerDot = document.createElement('div');
-        centerDot.className = 'goes-dot';
-        centerDot.id = 'goes-dot';
-        centerDot.style.left = `${offsetX + dotLeft * renderWidth}px`;
-        centerDot.style.top = `${offsetY + dotTop * renderHeight}px`;
-        markerLayer.appendChild(centerDot);
-      }
-    }
-
-    goesImg._updateMarkersRef = updateMarkers;
-    goesImg.addEventListener('load', updateMarkers);
-    window.addEventListener('resize', updateMarkers);
-
-    // Call updateMarkers immediately if the image is already loaded (cached)
-    if (goesImg.complete && goesImg.naturalWidth > 0) {
-      updateMarkers();
+      goesImgTpw._updateMarkersRef = () => updateMarkers('tpw');
+      goesImgTpw.addEventListener('load', goesImgTpw._updateMarkersRef);
+      window.addEventListener('resize', goesImgTpw._updateMarkersRef);
+      if (goesImgTpw.complete && goesImgTpw.naturalWidth > 0) updateMarkers('tpw');
     }
 
   } catch (err) {
     console.error('[goes] fetch failed:', err);
-    goesTime.textContent = '· unavailable';
+    if (goesTimeHi) goesTimeHi.textContent = '· unavailable';
+    if (goesTimeTpw) goesTimeTpw.textContent = '· unavailable';
+  }
+}
+
+function updateMarkers(sector) {
+  const goesImg = document.getElementById(`goes-img-${sector}`);
+  if (!goesImg) return;
+
+  const imgRect = goesImg.getBoundingClientRect();
+  const wrapperRect = goesImg.parentElement.getBoundingClientRect();
+  if (imgRect.width === 0 || imgRect.height === 0) return;
+
+  const imgRatio = goesImg.naturalWidth / goesImg.naturalHeight;
+  const containerRatio = imgRect.width / imgRect.height;
+
+  let renderWidth = imgRect.width;
+  let renderHeight = imgRect.height;
+  let offsetX = imgRect.left - wrapperRect.left;
+  let offsetY = imgRect.top - wrapperRect.top;
+
+  if (imgRatio > containerRatio) {
+    renderHeight = imgRect.width / imgRatio;
+    offsetY += (imgRect.height - renderHeight) / 2;
+  } else {
+    renderWidth = imgRect.height * imgRatio;
+    offsetX += (imgRect.width - renderWidth) / 2;
+  }
+
+  let dotLeft, dotTop;
+  if (sector === 'hi') {
+    dotLeft = 0.278; dotTop = 0.485;
+  } else {
+    dotLeft = 0.263; dotTop = 0.356;
+  }
+
+  const markerLayer = document.getElementById(`goes-marker-layer-${sector}`);
+  if (markerLayer) {
+    markerLayer.innerHTML = '';
+    const centerDot = document.createElement('div');
+    centerDot.className = 'goes-dot';
+    centerDot.style.left = `${offsetX + dotLeft * renderWidth}px`;
+    centerDot.style.top = `${offsetY + dotTop * renderHeight}px`;
+    markerLayer.appendChild(centerDot);
   }
 }
 
@@ -1117,7 +1117,7 @@ setInterval(() => {
   update();
 }, UPDATE_INTERVAL_MS);
 
-setInterval(refreshGoesImage, 10 * 60 * 1000);
+setInterval(loadGoesImages, 10 * 60 * 1000);
 
 if (initialData) {
   currentData = initialData;
