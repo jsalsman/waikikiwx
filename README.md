@@ -55,3 +55,29 @@ Then open:
    - `<div id="now-summary">` exists under the center metric row
    - `<link rel="icon">` updates to current hour `icon` URL after refresh
 3. Confirm mobile portrait layout stacks charts first, then tables.
+
+## Repository file tree and component descriptions
+
+```text
+waikikiwx/
+├── app.py                  # Flask application: routes, upstream API fetch logic, parsing, and JSON/template responses
+├── index.html              # Single-page Jinja template containing all markup, styles, and dashboard client-side logic
+├── Dockerfile              # Container build definition for production Cloud Run execution with Gunicorn
+├── cloudbuild.yaml         # Google Cloud Build pipeline for smoke tests, image build/push, and Cloud Run deploy
+├── requirements.txt        # Python dependency lock list used locally, in Docker, and in CI
+├── tests/
+│   ├── test_app.py         # Backend/unit-style endpoint coverage using Flask test_client + API mocking
+│   └── test_playwright.py  # End-to-end Playwright UI validation with screenshot/video artifacts
+├── screenshot.png          # Open Graph/social preview image served by the app
+├── LICENSE                 # MIT license terms for project usage and distribution
+├── README.md               # Project overview, usage, validation steps, and architecture notes
+└── AGENTS.md               # Repository automation instructions used by development agents
+```
+
+`app.py` is the backend control plane for the whole project. It initializes Flask, defines canonical Waikiki coordinates, discovers the weather.gov forecast/grid endpoints from the points API, and normalizes heterogeneous upstream data into a consistent 48-hour hourly payload consumed by the front end. It includes helper parsing utilities for wind strings and ISO-8601 valid-time windows, merges hourly and grid datasets (temperature, apparent temperature, gusts, precipitation probability, and quantitative precipitation), and applies sensible fallback behavior when sparse values are missing. It also provides operational and support endpoints (`/health-check`, `/icon`, `/goes-airmass`, `/screenshot.png`, and `/robots.txt`) in addition to serving `/` and `/forecast`, so the single module effectively handles rendering, API aggregation, and proxy-safe access patterns in one place.
+
+The `index.html` template is intentionally a self-contained UI surface: Jinja injects initial forecast data while vanilla JavaScript performs refresh/update behavior, DOM binding, icon updates, GOES overlay swapping, and SVG graph drawing without any framework dependency. Its CSS uses a responsive, terminal-inspired layout with flexbox, viewport-aware scaling variables, and explicit mobile portrait behavior so the same document works on phones, tablets, and desktop displays. The page combines four stacked forecast table blocks, three chart panels, and a dynamic “now” status strip, while also managing favicon updates and weather icon rendering for immediate visual context. In short, this file is both the view layer and the client runtime for the dashboard.
+
+The `Dockerfile` packages the app for production in a minimal Python 3.14 slim image, prioritizing predictable startup and safer runtime defaults. It sets Python environment flags for cleaner container behavior, creates and runs as a non-root `appuser`, installs requirements in a cache-friendly layer, and copies only the files needed at runtime (`app.py`, `index.html`, `screenshot.png`). The container exposes port 8080 and starts Gunicorn with multiple workers and a bounded timeout, aligning with Cloud Run expectations while preserving a simple image build path that mirrors local behavior.
+
+`cloudbuild.yaml` defines the CI/CD pipeline from validation through deployment. The first step (`Smoketests`) runs inside `python:3.14-slim` and does more than a superficial ping: it compiles all Python files, creates a virtual environment, installs dependencies, starts the Flask development server, installs `curl`, and verifies that the homepage response contains an expected sentinel string (`and/or fork:`), failing fast with response diagnostics if not. After this gate passes, the pipeline builds a no-cache Docker image, pushes it to Artifact Registry, and updates the Cloud Run service in `us-west1` using commit-based image tags and deployment labels for traceability. That smoketests stage is therefore the quality gate that protects the deploy stages from shipping obviously broken application behavior.
