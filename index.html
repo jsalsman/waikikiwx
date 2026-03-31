@@ -716,8 +716,16 @@ async function refreshGoesImage() {
         dotLeft = 0.263; dotTop = 0.356;
       }
 
-      goesDot.style.left = `${offsetX + dotLeft * renderWidth}px`;
-      goesDot.style.top = `${offsetY + dotTop * renderHeight}px`;
+      const markerLayer = document.getElementById('goes-marker-layer');
+      if (markerLayer) {
+        markerLayer.innerHTML = '';
+        const centerDot = document.createElement('div');
+        centerDot.className = 'goes-dot';
+        centerDot.id = 'goes-dot';
+        centerDot.style.left = `${offsetX + dotLeft * renderWidth}px`;
+        centerDot.style.top = `${offsetY + dotTop * renderHeight}px`;
+        markerLayer.appendChild(centerDot);
+      }
     }
 
     goesImg._updateMarkersRef = updateMarkers;
