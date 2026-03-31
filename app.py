@@ -142,6 +142,15 @@ def scrape_forecast():
         if apparent_temp[i] is None:
             apparent_temp[i] = temp[i]
 
+        # Custom wind chill adjustment for apparent temp between 50F and 80F
+        t = apparent_temp[i]
+        v = speed[i]
+        if 50 <= t <= 80 and v > 3:
+            # Standard NWS wind chill formula applied to higher temps
+            wc = 35.74 + (0.6215 * t) - (35.75 * (v**0.16)) + (0.4275 * t * (v**0.16))
+            if wc < t:
+                apparent_temp[i] = round(wc)
+
     for i in range(len(precip_in)):
         if precip_in[i] is None:
             precip_in[i] = 0.0
