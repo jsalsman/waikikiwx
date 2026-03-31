@@ -193,7 +193,7 @@ html, body {
   object-fit: cover; z-index: 9999; opacity: 0; transition: opacity 0.5s;
   pointer-events: none;
 }
-.gif-swap-zone.show-gif .goes-overlay { opacity: 0.7; }
+.gif-swap-zone.show-gif .goes-overlay { opacity: 0.9; }
 .gif-swap-zone.show-gif .block { background: transparent !important; }
 .goes-wrap {
   z-index: 9999;
@@ -719,14 +719,14 @@ async function refreshGoesImage() {
       let dotLeft, dotTop;
 
       if (currentSector === 'hi') {
-        circleLeft = 0.210; circleTop = 0.635;
-        circleDiamX = 0.0867; circleDiamY = 0.0867;
-        dotLeft = 0.210; dotTop = 0.635; // dot centered with circle
+        circleLeft = 0.264; circleTop = 0.428;
+        circleDiamX = 0.4335; circleDiamY = 0.4335;
+        dotLeft = 0.264; dotTop = 0.428; // dot centered with circle
       } else {
         // tpw
-        circleLeft = 0.2222; circleTop = 0.6481;
-        circleDiamX = 0.0578; circleDiamY = 0.0963;
-        dotLeft = 0.2222; dotTop = 0.6481; // dot centered with circle
+        circleLeft = 0.340; circleTop = 0.500;
+        circleDiamX = 0.0867; circleDiamY = 0.14445;
+        dotLeft = 0.340; dotTop = 0.500; // dot centered with circle
       }
 
       goesCircle.style.left = `${offsetX + circleLeft * renderWidth}px`;
