@@ -193,9 +193,9 @@ html, body {
   object-fit: cover; z-index: 9999; opacity: 0; transition: opacity 0.5s;
   pointer-events: none;
 }
-.gif-swap-zone.show-tpw .goes-overlay.tpw-overlay { opacity: 0.9; }
-.gif-swap-zone.show-hi .goes-overlay.hi-overlay { opacity: 0.9; }
-.gif-swap-zone.show-phmo .goes-overlay.phmo-overlay { opacity: 0.9; }
+.gif-swap-zone.show-tpw .goes-overlay.tpw-overlay { opacity: 0.9; pointer-events: auto; }
+.gif-swap-zone.show-hi .goes-overlay.hi-overlay { opacity: 0.9; pointer-events: auto; }
+.gif-swap-zone.show-phmo .goes-overlay.phmo-overlay { opacity: 0.9; pointer-events: auto; }
 .gif-swap-zone.show-tpw .block, .gif-swap-zone.show-hi .block, .gif-swap-zone.show-phmo .block { background: transparent !important; }
 .goes-wrap {
   z-index: 9999;
@@ -652,7 +652,9 @@ function attachGoesOverlay(parent) {
     <div class="goes-wrap">
       <div class="goes-title" id="goes-title-hi">GOES West Hawaii Air Mass <span class="goes-time" id="goes-time-hi">loading…</span></div>
       <div class="goes-img-wrap">
-        <img id="goes-img-hi" alt="Latest GOES West Hawaii Air Mass animation">
+        <a id="goes-link-hi" target="_blank" style="display: flex; width: 100%; height: 100%; text-decoration: none;">
+          <img id="goes-img-hi" alt="Latest GOES West Hawaii Air Mass animation">
+        </a>
         <div class="color-key-container">
           <div class="color-key-block" style="background: #b52007; color: #ffffff;">JET STREAM / DRY UPPER LEVEL</div>
           <div class="color-key-block" style="background: #0a0a8c; color: #ffffff;">COLD AIR MASS</div>
@@ -676,7 +678,9 @@ function attachGoesOverlay(parent) {
     <div class="goes-wrap">
       <div class="goes-title" id="goes-title-tpw">GOES West Tropical Pacific West Air Mass <span class="goes-time" id="goes-time-tpw">loading…</span></div>
       <div class="goes-img-wrap">
-        <img id="goes-img-tpw" alt="Latest GOES West Tropical Pacific West Air Mass animation">
+        <a id="goes-link-tpw" target="_blank" style="display: flex; width: 100%; height: 100%; text-decoration: none;">
+          <img id="goes-img-tpw" alt="Latest GOES West Tropical Pacific West Air Mass animation">
+        </a>
         <div class="goes-marker-layer tpw-marker-layer" id="goes-marker-layer-tpw">
           <div class="goes-dot"></div>
         </div>
@@ -690,7 +694,9 @@ function attachGoesOverlay(parent) {
     <div class="goes-wrap">
       <div class="goes-title" id="goes-title-phmo">NWS Hawaii Radar loop <span class="goes-time" id="goes-time-phmo">loading…</span></div>
       <div class="goes-img-wrap">
-        <img id="goes-img-phmo" alt="Latest NWS Hawaii Radar loop animation">
+        <a id="goes-link-phmo" target="_blank" style="display: flex; width: 100%; height: 100%; text-decoration: none;">
+          <img id="goes-img-phmo" alt="Latest NWS Hawaii Radar loop animation">
+        </a>
         <div class="goes-marker-layer phmo-marker-layer" id="goes-marker-layer-phmo">
           <div class="goes-dot"></div>
         </div>
@@ -754,6 +760,8 @@ async function loadGoesImages() {
     // PHMO Radar Loop
     goesImgPhmo.src = `https://radar.weather.gov/ridge/standard/PHMO_loop.gif?t=${ts}`;
     goesTimePhmo.textContent = timeStr;
+    const goesLinkPhmo = document.getElementById('goes-link-phmo');
+    if (goesLinkPhmo) goesLinkPhmo.href = goesImgPhmo.src;
 
     // Setup markers for phmo
     if (goesImgPhmo._updateMarkersRef) {
@@ -768,6 +776,8 @@ async function loadGoesImages() {
     if (urls.hi) {
       goesImgHi.src = `${urls.hi}${urls.hi.includes('?') ? '&' : '?'}t=${ts}`;
       goesTimeHi.textContent = timeStr;
+      const goesLinkHi = document.getElementById('goes-link-hi');
+      if (goesLinkHi) goesLinkHi.href = goesImgHi.src;
 
       // Setup markers for hi
       if (goesImgHi._updateMarkersRef) {
@@ -783,6 +793,8 @@ async function loadGoesImages() {
     if (urls.tpw) {
       goesImgTpw.src = `${urls.tpw}${urls.tpw.includes('?') ? '&' : '?'}t=${ts}`;
       goesTimeTpw.textContent = timeStr;
+      const goesLinkTpw = document.getElementById('goes-link-tpw');
+      if (goesLinkTpw) goesLinkTpw.href = goesImgTpw.src;
 
       // Setup markers for tpw
       if (goesImgTpw._updateMarkersRef) {
