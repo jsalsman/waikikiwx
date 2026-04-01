@@ -99,30 +99,39 @@ The `Dockerfile` packages the app for production in a minimal Python 3.14 slim i
 
 `cloudbuild.yaml` defines the CI/CD pipeline from validation through deployment. The first step (`Smoketests`) runs inside `python:3.14-slim` and does more than a superficial ping: it compiles all Python files, creates a virtual environment, installs dependencies, starts the Flask development server, installs `curl`, and verifies that the homepage response contains an expected sentinel string (`and/or fork:`), failing fast with response diagnostics if not. After this gate passes, the pipeline builds a no-cache Docker image, pushes it to Artifact Registry, and updates the Cloud Run service in `us-west1` using commit-based image tags and deployment labels for traceability. That smoketests stage is therefore the quality gate that protects the deploy stages from shipping obviously broken application behavior.
 
-## Daily YouTube Shorts Automation
+## Daily YouTube Video Automation
 
-A Python script (`daily_short.py`) is included to automate generating and uploading a 60-second YouTube Short of the live dashboard. The script leverages Playwright to record a headless session, FFmpeg to clip/format it into an MP4, and the YouTube API to upload it. It fetches OAuth credentials from Google Secret Manager to bypass Service Account upload restrictions.
+A Python script (`daily_video.py`) is included to automate generating and uploading a 60-second YouTube video (1080p landscape) of the live dashboard. The script leverages Playwright to record a headless session, FFmpeg to clip/format it into an MP4, and the YouTube API to upload it. It fetches OAuth credentials from Google Secret Manager to bypass Service Account upload restrictions.
 
-### Deployment as a Cloud Run Job
+Because generating video is a CPU-intensive, long-running process that would be throttled by a standard Cloud Run web service, it must be deployed as a dedicated Cloud Run Job.
 
-To deploy this script as a Cloud Run Job to be run via Cloud Scheduler:
+### Setting up YouTube Secrets
+You must use a Google User Account to authorize the YouTube Data API. Generate an OAuth Refresh Token and store the credentials in Google Cloud Secret Manager:
+1. Create three secrets in Secret Manager: `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, and `YOUTUBE_REFRESH_TOKEN`.
+2. Ensure the Service Account running the Cloud Run Job has the `Secret Manager Secret Accessor` role.
+
+### Deploying as a Cloud Run Job
+
+To deploy this script as a Cloud Run Job:
 
 ```bash
-# Build and push the updated image (or let Cloud Build do it)
-# Deploy as a new Cloud Run Job:
-gcloud run jobs create waikikiwx-daily-short \
+# Build and push the updated Docker image, then create the Job:
+gcloud run jobs create waikikiwx-daily-video \
   --image gcr.io/YOUR_PROJECT_ID/waikikiwx:latest \
   --command "python" \
-  --args "daily_short.py" \
+  --args "daily_video.py" \
   --region us-west1 \
+  --service-account "YOUR_SERVICE_ACCOUNT_EMAIL" \
   --set-env-vars="GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID"
 ```
 
-Then create a Cloud Scheduler trigger to run it daily:
+### Automating with Cloud Scheduler
+
+Create a Cloud Scheduler trigger to run the Job daily (e.g., at 8:00 AM):
 ```bash
-gcloud scheduler jobs create http waikiki-short-trigger \
+gcloud scheduler jobs create http waikiki-video-trigger \
   --schedule="0 8 * * *" \
-  --uri="https://us-west1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/YOUR_PROJECT_ID/jobs/waikikiwx-daily-short:run" \
+  --uri="https://us-west1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/YOUR_PROJECT_ID/jobs/waikikiwx-daily-video:run" \
   --http-method POST \
   --oauth-service-account-email="YOUR_SERVICE_ACCOUNT_EMAIL"
 ```

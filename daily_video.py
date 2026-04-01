@@ -7,12 +7,19 @@ from google.cloud import secretmanager
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
-PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
+def get_project_id():
+    import google.auth
+    _, project_id = google.auth.default()
+    return project_id or os.environ.get("GOOGLE_CLOUD_PROJECT", "")
 
 def get_secret(secret_id, version_id="latest"):
     """Fetch secret from Google Cloud Secret Manager."""
     client = secretmanager.SecretManagerServiceClient()
-    name = f"projects/{PROJECT_ID}/secrets/{secret_id}/versions/{version_id}"
+    project_id = get_project_id()
+    if not project_id:
+        raise Exception("Could not determine Google Cloud Project ID for Secret Manager.")
+
+    name = f"projects/{project_id}/secrets/{secret_id}/versions/{version_id}"
     response = client.access_secret_version(request={"name": name})
     return response.payload.data.decode("UTF-8")
 
@@ -22,11 +29,11 @@ def record_video():
     webm_path = ""
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        # Create context with 1080x1920 (9:16) for YouTube Shorts
+        # Create context with 1920x1080 (16:9) for standard YouTube video
         context = browser.new_context(
-            viewport={"width": 1080, "height": 1920},
+            viewport={"width": 1920, "height": 1080},
             record_video_dir=".",
-            record_video_size={"width": 1080, "height": 1920}
+            record_video_size={"width": 1920, "height": 1080}
         )
         page = context.new_page()
         page.goto("https://waikikiwx.live")
@@ -77,12 +84,15 @@ def process_video(input_webm, output_mp4="output_short.mp4"):
 def upload_to_youtube(video_path):
     """Upload the video to YouTube."""
     print("Authenticating with YouTube API...")
-    if not PROJECT_ID:
-        print("WARNING: GOOGLE_CLOUD_PROJECT environment variable not set. Secret Manager may fail.")
 
-    client_id = get_secret("YOUTUBE_CLIENT_ID")
-    client_secret = get_secret("YOUTUBE_CLIENT_SECRET")
-    refresh_token = get_secret("YOUTUBE_REFRESH_TOKEN")
+    try:
+        client_id = get_secret("YOUTUBE_CLIENT_ID")
+        client_secret = get_secret("YOUTUBE_CLIENT_SECRET")
+        refresh_token = get_secret("YOUTUBE_REFRESH_TOKEN")
+    except Exception as e:
+        print(f"Error fetching secrets: {e}")
+        print("Cannot upload to YouTube without credentials. Exiting gracefully.")
+        return
 
     credentials = Credentials(
         token=None,
@@ -96,7 +106,7 @@ def upload_to_youtube(video_path):
 
     date_str = datetime.now().strftime("%Y-%m-%d")
     title = f"Waikiki Live Weather - {date_str}"
-    description = "Automated daily weather update for Waikiki. #Shorts #Waikiki #Weather"
+    description = "Automated daily weather update for Waikiki. #Waikiki #Weather"
 
     print(f"Uploading '{title}' to YouTube...")
 
@@ -134,7 +144,7 @@ if __name__ == "__main__":
         mp4_file = process_video(webm_file)
         upload_to_youtube(mp4_file)
     except Exception as e:
-        print(f"Error during daily short automation: {e}")
+        print(f"Error during daily video automation: {e}")
         import sys
         sys.exit(1)
     finally:
