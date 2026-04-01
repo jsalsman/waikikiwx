@@ -201,8 +201,13 @@ def get_goes_airmass_url(sector):
 @app.route('/cron/collect-forecast')
 def cron_collect_forecast():
     # Require a simple API key query parameter to prevent unauthorized execution
+    expected_key = os.environ.get('COLLECT_FORECAST_KEY')
+    if not expected_key:
+        app.logger.error("COLLECT_FORECAST_KEY environment variable is not set")
+        return "Server misconfigured", 500
+
     key = request.args.get('key')
-    if key != 'secret01234':
+    if not key or key != expected_key:
         return "Unauthorized", 401
 
     try:

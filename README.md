@@ -44,17 +44,21 @@ Then open:
 - `http://127.0.0.1:8080/icon?url=...` for NWS icon proxying
 - `http://127.0.0.1:8080/screenshot.png` for the open graph screenshot image
 - `http://127.0.0.1:8080/robots.txt` for crawler rules
-- `http://127.0.0.1:8080/cron/collect-forecast?key=secret01234` for triggering the GCS forecast export
+- `http://127.0.0.1:8080/cron/collect-forecast?key=YOUR_SECRET_KEY` for triggering the GCS forecast export
 
 ## Historical Data Collection
 
-The application includes a specialized endpoint (`/cron/collect-forecast?key=secret01234`) designed to periodically save forecast snapshots to a Google Cloud Storage bucket (`waikikiwx`). This historical dataset will eventually be used to compute 50% confidence intervals for temperature, precipitation probability, and wind speed.
+The application includes a specialized endpoint (`/cron/collect-forecast?key=YOUR_SECRET_KEY`) designed to periodically save forecast snapshots to a Google Cloud Storage bucket (`waikikiwx`). This historical dataset will eventually be used to compute 50% confidence intervals for temperature, precipitation probability, and wind speed.
 
+### Configuration
+1. Set the `COLLECT_FORECAST_KEY` environment variable in your Google Cloud Run service to a secure, random string (e.g., `YOUR_SECRET_KEY`).
+2. The service account running the Cloud Run application must have write access to the `waikikiwx` GCS bucket.
+
+### Automation via Google Cloud Scheduler
 To automate this collection using [Google Cloud Scheduler](https://cloud.google.com/scheduler/docs/creating):
 1. Create a new Cloud Scheduler job.
 2. Set the frequency to every 10 minutes (e.g., `*/10 * * * *`).
-3. Set the target type to HTTP and the URL to `https://waikikiwx.live/cron/collect-forecast?key=secret01234`.
-4. The service account running the Cloud Run application must have write access to the `waikikiwx` GCS bucket.
+3. Set the target type to HTTP and the URL to `https://waikikiwx.live/cron/collect-forecast?key=YOUR_SECRET_KEY` (replacing `YOUR_SECRET_KEY` with the exact string you used for the `COLLECT_FORECAST_KEY` environment variable).
 
 The endpoint saves a JSON file for each execution at `gs://waikikiwx/forecast-YYYY-MM-DD-HH-MM.json` (using Hawaii-Aleutian Standard Time).
 
