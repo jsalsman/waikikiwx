@@ -221,10 +221,10 @@ def cron_collect_forecast():
         hst = datetime.timezone(datetime.timedelta(hours=-10))
         now_hst = datetime.datetime.now(hst)
 
-        # Construct the GCS object path: forecasts/YYYY-MM-DD/HH-MM.json
+        # Construct the GCS object path: forecast-YYYY-MM-DD-HH-MM.json
         date_str = now_hst.strftime('%Y-%m-%d')
         time_str = now_hst.strftime('%H-%M')
-        blob_path = f'forecasts/{date_str}/{time_str}.json'
+        blob_path = f'forecast-{date_str}-{time_str}.json'
 
         # Upload to Google Cloud Storage
         storage_client = storage.Client()

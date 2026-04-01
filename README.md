@@ -56,7 +56,7 @@ To automate this collection using [Google Cloud Scheduler](https://cloud.google.
 3. Set the target type to HTTP and the URL to `https://waikikiwx.live/cron/collect-forecast?key=secret01234`.
 4. The service account running the Cloud Run application must have write access to the `waikikiwx` GCS bucket.
 
-The endpoint saves a JSON file for each execution at `gs://waikikiwx/forecasts/YYYY-MM-DD/HH-MM.json` (using Hawaii-Aleutian Standard Time).
+The endpoint saves a JSON file for each execution at `gs://waikikiwx/forecast-YYYY-MM-DD-HH-MM.json` (using Hawaii-Aleutian Standard Time).
 
 ## Quick validation checklist
 
