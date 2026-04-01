@@ -1,6 +1,7 @@
 venv/
 __pycache__/
 *.log
+*log.txt
 *.webm
 # had .png but e.g. screenshot.png
 tests/verification/
