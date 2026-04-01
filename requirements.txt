@@ -6,3 +6,4 @@ playwright
 google-api-python-client
 google-auth-oauthlib
 google-cloud-secret-manager
+gevent
