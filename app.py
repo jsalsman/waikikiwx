@@ -1,6 +1,8 @@
 import json, os, re, requests, datetime, math, collections
 from google.cloud import storage
-from flask import Flask, jsonify, send_from_directory, render_template, request, Response
+from flask import Flask, jsonify, send_from_directory, render_template, request, Response, stream_with_context
+import subprocess, time, signal
+from playwright.sync_api import sync_playwright
 
 app = Flask(__name__, template_folder='.')
 
@@ -416,6 +418,130 @@ def health_check():
     except requests.RequestException as e:
         app.logger.error(f'api.weather.gov health check failed: {e}')
         return jsonify({"status": "error", "api.weather.gov": "unreachable"}), 500
+
+@app.route('/live-stream')
+def live_stream():
+    expected_key = os.environ.get('COLLECT_FORECAST_KEY')
+    if not expected_key:
+        app.logger.error("COLLECT_FORECAST_KEY environment variable is not set")
+        return "Server misconfigured", 500
+
+    key = request.args.get('cfkey')
+    if not key or key != expected_key:
+        return "Unauthorized", 401
+
+    try:
+        duration_minutes = float(request.args.get('duration', 1))
+    except ValueError:
+        return "Invalid duration", 400
+
+    stream_key = os.environ.get('YOUTUBE_STREAM_KEY')
+    if not stream_key:
+        app.logger.error("YOUTUBE_STREAM_KEY environment variable is not set")
+        return "YouTube stream key not configured", 500
+
+    def generate():
+        start_time = time.time()
+        duration_seconds = duration_minutes * 60
+
+        # We will set up Xvfb, Playwright, and FFmpeg
+        xvfb_proc = None
+        playwright_context_mgr = None
+        playwright_browser = None
+        ffmpeg_proc = None
+
+        try:
+            yield "Starting Xvfb...\n"
+            import uuid
+            # Use a random display port to allow concurrent executions
+            display_num = str(uuid.uuid4().int % 10000 + 100)
+            display = f":{display_num}"
+            xvfb_proc = subprocess.Popen(["Xvfb", display, "-screen", "0", "1920x1080x24"])
+            time.sleep(1) # Wait for Xvfb to start
+            if xvfb_proc.poll() is not None:
+                yield f"Failed to start Xvfb on {display}.\n"
+                return
+
+            # Use a specific env dict for playwright rather than modifying global os.environ
+            pw_env = os.environ.copy()
+            pw_env["DISPLAY"] = display
+
+            yield "Starting Playwright...\n"
+            playwright_context_mgr = sync_playwright()
+            p = playwright_context_mgr.start()
+            playwright_browser = p.chromium.launch(headless=False, env=pw_env, args=['--window-size=1920,1080', '--window-position=0,0', '--no-sandbox'])
+            context = playwright_browser.new_context(viewport={"width": 1920, "height": 1080})
+            page = context.new_page()
+
+            # Use local URL to capture the site directly
+            yield "Navigating to site...\n"
+            page.goto("http://127.0.0.1:8080/")
+            # Wait a few seconds for data to load and render
+            time.sleep(5)
+
+            yield "Starting FFmpeg stream...\n"
+            ffmpeg_cmd = [
+                "ffmpeg",
+                "-f", "x11grab",
+                "-s", "1920x1080",
+                "-framerate", "30",
+                "-i", display,
+                "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+                "-c:v", "libx264",
+                "-preset", "veryfast",
+                "-b:v", "2500k",
+                "-maxrate", "2500k",
+                "-bufsize", "5000k",
+                "-pix_fmt", "yuv420p",
+                "-g", "60",
+                "-c:a", "aac",
+                "-b:a", "128k",
+                "-ar", "44100",
+                "-f", "flv",
+                f"rtmp://a.rtmp.youtube.com/live2/{stream_key}"
+            ]
+            ffmpeg_proc = subprocess.Popen(ffmpeg_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+
+            yield f"Streaming for {duration_minutes} minutes...\n"
+            while time.time() - start_time < duration_seconds:
+                if ffmpeg_proc.poll() is not None:
+                    yield "FFmpeg process exited unexpectedly.\n"
+                    break
+                yield f"Streaming... {int(time.time() - start_time)}s elapsed.\n"
+                time.sleep(5)
+
+            yield "Streaming completed successfully.\n"
+
+        except Exception as e:
+            app.logger.error(f"Error during live stream: {e}")
+            yield f"Error during streaming: {e}\n"
+        finally:
+            if ffmpeg_proc and ffmpeg_proc.poll() is None:
+                ffmpeg_proc.terminate()
+                try:
+                    ffmpeg_proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    ffmpeg_proc.kill()
+            if playwright_browser:
+                try:
+                    playwright_browser.close()
+                except:
+                    pass
+            if playwright_context_mgr:
+                try:
+                    playwright_context_mgr.stop()
+                except:
+                    pass
+            if xvfb_proc and xvfb_proc.poll() is None:
+                xvfb_proc.terminate()
+                try:
+                    xvfb_proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    xvfb_proc.kill()
+
+    response = Response(stream_with_context(generate()), mimetype='text/plain')
+    response.headers['X-Accel-Buffering'] = 'no'
+    return response
 
 @app.route('/')
 def index():

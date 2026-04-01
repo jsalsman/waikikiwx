@@ -2,8 +2,8 @@ FROM python:3.14-slim
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 
-# Install system dependencies (ffmpeg and playwright browser dependencies)
-RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
+# Install system dependencies (ffmpeg, xvfb, and playwright browser dependencies)
+RUN apt-get update && apt-get install -y ffmpeg xvfb && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user 
 RUN useradd --create-home --no-log-init appuser
@@ -23,6 +23,6 @@ USER appuser
 # Install Playwright browsers (as appuser)
 RUN playwright install chromium
 
-COPY --chown=appuser:appuser app.py index.html screenshot.png daily_video.py ./
+COPY --chown=appuser:appuser app.py index.html screenshot.png ./
 EXPOSE 8080
 CMD ["python", "-m", "gunicorn", "-b", "0.0.0.0:8080", "-k", "gevent", "-w", "1", "app:app"]
