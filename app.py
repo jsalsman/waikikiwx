@@ -1,5 +1,10 @@
+import json
+import os
 import re
 import requests
+import datetime
+import math
+from google.cloud import storage
 from flask import Flask, jsonify, send_from_directory, render_template, request, Response
 
 app = Flask(__name__, template_folder='.')
@@ -192,6 +197,56 @@ def get_goes_airmass_url(sector):
         raise ValueError(f'No GOES Air Mass GIF URL found on NOAA sector page for sector={sector}')
     latest = matches[-1]
     return latest if latest.startswith('http') else GOES_CDN_PREFIX + latest
+
+@app.route('/cron/collect-forecast')
+def cron_collect_forecast():
+    # Require a simple API key query parameter to prevent unauthorized execution
+    expected_key = os.environ.get('COLLECT_FORECAST_KEY')
+    if not expected_key:
+        app.logger.error("COLLECT_FORECAST_KEY environment variable is not set")
+        return "Server misconfigured", 500
+
+    key = request.args.get('key')
+    if not key or key != expected_key:
+        return "Unauthorized", 401
+
+    try:
+        # Fetch the complete forecast dataset
+        data = scrape_forecast()
+
+        # We only need specific fields for confidence intervals
+        saved_data = {
+            'hour': data.get('hour', []),
+            'temp': data.get('temp', []),
+            'precip': data.get('precip', []),
+            'speed': data.get('speed', [])
+        }
+
+        # Determine HST time (UTC - 10 hours)
+        hst = datetime.timezone(datetime.timedelta(hours=-10))
+        now_hst = datetime.datetime.now(hst)
+
+        # Construct the GCS object path: forecast-YYYY-MM-DD-HH-MM.json
+        date_str = now_hst.strftime('%Y-%m-%d')
+        time_str = now_hst.strftime('%H-%M')
+        blob_path = f'forecast-{date_str}-{time_str}.json'
+
+        # Upload to Google Cloud Storage
+        storage_client = storage.Client()
+        bucket = storage_client.bucket('waikikiwx')
+        blob = bucket.blob(blob_path)
+
+        json_payload = json.dumps(saved_data)
+        blob.upload_from_string(json_payload, content_type='application/json')
+
+        app.logger.info(f"Successfully uploaded forecast to gs://waikikiwx/{blob_path}")
+        return jsonify({"status": "success", "file": f"gs://waikikiwx/{blob_path}"}), 200
+
+    except Exception as e:
+        msg = f"Failed to collect and upload forecast: {e}"
+        app.logger.error(msg)
+        return jsonify({"error": msg}), 500
+
 
 @app.route('/health-check')
 def health_check():
