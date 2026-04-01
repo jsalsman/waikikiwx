@@ -99,39 +99,18 @@ The `Dockerfile` packages the app for production in a minimal Python 3.14 slim i
 
 `cloudbuild.yaml` defines the CI/CD pipeline from validation through deployment. The first step (`Smoketests`) runs inside `python:3.14-slim` and does more than a superficial ping: it compiles all Python files, creates a virtual environment, installs dependencies, starts the Flask development server, installs `curl`, and verifies that the homepage response contains an expected sentinel string (`and/or fork:`), failing fast with response diagnostics if not. After this gate passes, the pipeline builds a no-cache Docker image, pushes it to Artifact Registry, and updates the Cloud Run service in `us-west1` using commit-based image tags and deployment labels for traceability. That smoketests stage is therefore the quality gate that protects the deploy stages from shipping obviously broken application behavior.
 
-## Daily YouTube Video Automation
+## Live YouTube Streaming
 
-A Python script (`daily_video.py`) is included to automate generating and uploading a 60-second YouTube video (1080p landscape) of the live dashboard. The script leverages Playwright to record a headless session, FFmpeg to clip/format it into an MP4, and the YouTube API to upload it. It fetches OAuth credentials from Google Secret Manager to bypass Service Account upload restrictions.
+The dashboard supports live streaming directly to YouTube via RTMP.
 
-Because generating video is a CPU-intensive, long-running process that would be throttled by a standard Cloud Run web service, it must be deployed as a dedicated Cloud Run Job.
-
-### Setting up YouTube Secrets
-You must use a Google User Account to authorize the YouTube Data API. Generate an OAuth Refresh Token and store the credentials in Google Cloud Secret Manager:
-1. Create three secrets in Secret Manager: `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, and `YOUTUBE_REFRESH_TOKEN`.
-2. Ensure the Service Account running the Cloud Run Job has the `Secret Manager Secret Accessor` role.
-
-### Deploying as a Cloud Run Job
-
-To deploy this script as a Cloud Run Job:
-
-```bash
-# Build and push the updated Docker image, then create the Job:
-gcloud run jobs create waikikiwx-daily-video \
-  --image gcr.io/YOUR_PROJECT_ID/waikikiwx:latest \
-  --command "python" \
-  --args "daily_video.py" \
-  --region us-west1 \
-  --service-account "YOUR_SERVICE_ACCOUNT_EMAIL" \
-  --set-env-vars="GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID"
-```
+### Configuration
+1. Set the `YOUTUBE_STREAM_KEY` environment variable in your Google Cloud Run service to your YouTube Live stream key.
+2. Set the `COLLECT_FORECAST_KEY` environment variable as described in the Historical Data Collection section.
 
 ### Automating with Cloud Scheduler
+To start a 1-minute live stream using Cloud Scheduler:
+1. Create a new Cloud Scheduler job.
+2. Set the frequency as desired (e.g., `0 8 * * *` for daily at 8:00 AM).
+3. Set the target type to HTTP and the URL to `https://waikikiwx.live/live-stream?cfkey=YOUR_SECRET_KEY&duration=1`.
 
-Create a Cloud Scheduler trigger to run the Job daily (e.g., at 8:00 AM):
-```bash
-gcloud scheduler jobs create http waikiki-video-trigger \
-  --schedule="0 8 * * *" \
-  --uri="https://us-west1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/YOUR_PROJECT_ID/jobs/waikikiwx-daily-video:run" \
-  --http-method POST \
-  --oauth-service-account-email="YOUR_SERVICE_ACCOUNT_EMAIL"
-```
+The `/live-stream` endpoint streams a status update back to the caller every 5 seconds to keep the HTTP connection alive while the streaming occurs in the background. It starts an Xvfb virtual display, opens a Playwright browser window locally, and uses FFmpeg to stream the visual display directly to the YouTube RTMP endpoint.
