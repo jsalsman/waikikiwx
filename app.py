@@ -70,6 +70,92 @@ def parse_iso8601_duration(d):
     total_hours = (days * 24) + hours
     return total_hours if total_hours > 0 else 1
 
+import collections
+
+def percentile(N, percent, key=lambda x:x):
+    if not N:
+        return None
+    N.sort(key=key)
+    k = (len(N)-1) * percent
+    f = math.floor(k)
+    c = math.ceil(k)
+    if f == c:
+        return key(N[int(k)])
+    d0 = key(N[int(f)]) * (c-k)
+    d1 = key(N[int(c)]) * (k-f)
+    return d0+d1
+
+def get_target_times(start_dt, hours):
+    times = []
+    current = start_dt.replace(minute=0, second=0, microsecond=0)
+    if not hours:
+        return times
+
+    prev_h = current.hour
+    for h_str in hours:
+        h = int(h_str)
+        if h < prev_h and (prev_h - h) > 12:
+            current += datetime.timedelta(days=1)
+        current = current.replace(hour=h)
+        times.append(current)
+        prev_h = h
+    return times
+
+def calculate_ci_from_history(historical_forecasts):
+    predictions_by_target = collections.defaultdict(list)
+    for hf in historical_forecasts:
+        f_time = hf['time']
+        data = hf['data']
+        hours = data.get('hour', [])
+        target_times = get_target_times(f_time, hours)
+
+        for i, t_time in enumerate(target_times):
+            temp_val = data['temp'][i] if i < len(data.get('temp', [])) else None
+            precip_val = data['precip'][i] if i < len(data.get('precip', [])) else None
+            speed_val = data['speed'][i] if i < len(data.get('speed', [])) else None
+
+            predictions_by_target[t_time].append({
+                'fetch_time': f_time,
+                'lead_index': i,
+                'temp': temp_val,
+                'precip': precip_val,
+                'speed': speed_val,
+            })
+
+    errors_by_lead = collections.defaultdict(lambda: {'temp': [], 'precip': [], 'speed': []})
+
+    for t_time, preds in predictions_by_target.items():
+        if not preds: continue
+        most_recent_pred = max(preds, key=lambda x: x['fetch_time'])
+
+        for p in preds:
+            if p == most_recent_pred:
+                continue
+
+            lead_idx = p['lead_index']
+            if p['temp'] is not None and most_recent_pred['temp'] is not None:
+                errors_by_lead[lead_idx]['temp'].append(p['temp'] - most_recent_pred['temp'])
+            if p['precip'] is not None and most_recent_pred['precip'] is not None:
+                errors_by_lead[lead_idx]['precip'].append(p['precip'] - most_recent_pred['precip'])
+            if p['speed'] is not None and most_recent_pred['speed'] is not None:
+                errors_by_lead[lead_idx]['speed'].append(p['speed'] - most_recent_pred['speed'])
+
+    ci_bounds = {}
+
+    for lead_idx in range(48):
+        lead_errors = errors_by_lead.get(lead_idx, {'temp': [], 'precip': [], 'speed': []})
+
+        ci_bounds[str(lead_idx)] = {
+            'temp_error_low': percentile(lead_errors['temp'], 0.25) or 0,
+            'temp_error_high': percentile(lead_errors['temp'], 0.75) or 0,
+            'precip_error_low': percentile(lead_errors['precip'], 0.25) or 0,
+            'precip_error_high': percentile(lead_errors['precip'], 0.75) or 0,
+            'speed_error_low': percentile(lead_errors['speed'], 0.25) or 0,
+            'speed_error_high': percentile(lead_errors['speed'], 0.75) or 0,
+        }
+
+    return ci_bounds
+
 def map_grid_series_to_hourly(series_values, hourly_dts, converter=None):
     # series_values: [{'validTime': '2026-03-30T10:00:00+00:00/PT3H', 'value': 21.6}, ...]
     # hourly_dts: list of datetime objects (timezone-aware)
@@ -121,25 +207,20 @@ def scrape_forecast():
     grid_props = resp_grid.json().get('properties', {})
 
     raw_apparent = grid_props.get('apparentTemperature', {}).get('values', [])
-    # C to F converter
     def c_to_f(c): return round(c * 9/5 + 32)
     apparent_temp = map_grid_series_to_hourly(raw_apparent, hourly_dts, converter=c_to_f)
 
     raw_gust = grid_props.get('windGust', {}).get('values', [])
-    # km/h to mph converter
     def kmh_to_mph(kmh): return round(kmh / 1.60934)
     wind_gust = map_grid_series_to_hourly(raw_gust, hourly_dts, converter=kmh_to_mph)
 
     raw_qpf = grid_props.get('quantitativePrecipitation', {}).get('values', [])
-    # mm to inches converter
     def mm_to_in(mm): return round(mm / 25.4, 2)
     precip_in = map_grid_series_to_hourly(raw_qpf, hourly_dts, converter=mm_to_in)
 
     raw_rh = grid_props.get('relativeHumidity', {}).get('values', [])
-    # no conversion needed for RH %
     rh_hourly = map_grid_series_to_hourly(raw_rh, hourly_dts)
 
-    # In case there's no gust data or missing values, we'll fill None with speed
     speed = [parse_wind_speed(p['windSpeed']) for p in periods]
     for i in range(len(wind_gust)):
         if wind_gust[i] is None:
@@ -152,7 +233,6 @@ def scrape_forecast():
         if apparent_temp[i] is None:
             apparent_temp[i] = temp[i]
 
-        # Custom apparent temperature adjustment using Australian Apparent Temperature
         t_f = apparent_temp[i]
         v_mph = speed[i]
         rh = rh_hourly[i] if rh_hourly and i < len(rh_hourly) and rh_hourly[i] is not None else 50
@@ -167,22 +247,79 @@ def scrape_forecast():
             if at_f < t_f:
                 apparent_temp[i] = round(at_f)
 
+    precip = []
+    for p in periods:
+        pop = p.get('probabilityOfPrecipitation', {})
+        val = pop.get('value')
+        precip.append(val if val is not None else 0)
+
     for i in range(len(precip_in)):
         if precip_in[i] is None:
             precip_in[i] = 0.0
 
-    return {
-        'hour':          [hour_from_iso(p['startTime']) for p in periods],
-        'direction':     [p['windDirection'] for p in periods],
-        'speed':         speed,
-        'gust':          wind_gust,
-        'temp':          temp,
+    def hour_from_iso(iso):
+        return int(iso.split('T')[1][:2])
+
+    forecast_data = {
+        'hour': [hour_from_iso(p['startTime']) for p in periods],
+        'temp': temp,
         'apparent_temp': apparent_temp,
-        'precip':        [p['probabilityOfPrecipitation']['value'] or 0 for p in periods],
-        'precip_in':     precip_in,
-        'icon':          [p.get('icon', '') for p in periods],
-        'short':         [p.get('shortForecast', '') for p in periods],
+        'precip': precip,
+        'precip_in': precip_in,
+        'speed': speed,
+        'gust': wind_gust,
+        'direction': [p['windDirection'] for p in periods],
+        'icon': [p.get('icon', '') for p in periods],
+        'short': [p.get('shortForecast', '') for p in periods]
     }
+
+    # Fetch pre-calculated confidence intervals from GCS
+    ci_bounds = {}
+    try:
+        if not os.environ.get('GOOGLE_APPLICATION_CREDENTIALS') and not os.environ.get('KUBERNETES_SERVICE_HOST'):
+            pass
+        else:
+            client = storage.Client()
+            bucket = client.bucket('waikikiwx')
+            blob = bucket.blob('confidence-intervals.json')
+            if blob.exists():
+                ci_bounds = json.loads(blob.download_as_string())
+    except Exception as e:
+        app.logger.warning(f"Failed to fetch confidence intervals from GCS: {e}")
+
+    temp_lower, temp_upper = [], []
+    precip_lower, precip_upper = [], []
+    speed_lower, speed_upper = [], []
+
+    for i in range(len(forecast_data['hour'])):
+        bounds = ci_bounds.get(str(i), {
+            'temp_error_low': 0, 'temp_error_high': 0,
+            'precip_error_low': 0, 'precip_error_high': 0,
+            'speed_error_low': 0, 'speed_error_high': 0,
+        })
+
+        c_temp = forecast_data['temp'][i] if i < len(forecast_data['temp']) else 0
+        c_precip = forecast_data['precip'][i] if i < len(forecast_data['precip']) else 0
+        c_speed = forecast_data['speed'][i] if i < len(forecast_data['speed']) else 0
+
+        # Lower bound = current forecast + lower bound error (which is negative)
+        temp_lower.append(round(c_temp + bounds['temp_error_low']))
+        temp_upper.append(round(c_temp + bounds['temp_error_high']))
+
+        precip_lower.append(max(0, min(100, round(c_precip + bounds['precip_error_low']))))
+        precip_upper.append(max(0, min(100, round(c_precip + bounds['precip_error_high']))))
+
+        speed_lower.append(max(0, round(c_speed + bounds['speed_error_low'])))
+        speed_upper.append(max(0, round(c_speed + bounds['speed_error_high'])))
+
+    forecast_data['temp_ci_lower'] = temp_lower
+    forecast_data['temp_ci_upper'] = temp_upper
+    forecast_data['precip_ci_lower'] = precip_lower
+    forecast_data['precip_ci_upper'] = precip_upper
+    forecast_data['speed_ci_lower'] = speed_lower
+    forecast_data['speed_ci_upper'] = speed_upper
+
+    return forecast_data
 
 def get_goes_airmass_url(sector):
     sector_url = f'https://www.star.nesdis.noaa.gov/goes/sector.php?sat=G18&sector={sector}'
@@ -240,6 +377,38 @@ def cron_collect_forecast():
         blob.upload_from_string(json_payload, content_type='application/json')
 
         app.logger.info(f"Successfully uploaded forecast to gs://waikikiwx/{blob_path}")
+
+        # Now compute the confidence intervals
+        try:
+            blobs = list(bucket.list_blobs(prefix='forecast-'))
+            cutoff = datetime.datetime.now() - datetime.timedelta(days=90)
+
+            historical_forecasts = []
+            for hblob in blobs:
+                m = re.match(r'forecast-(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})\.json', hblob.name)
+                if m:
+                    y, mth, d, h, mnt = map(int, m.groups())
+                    dt = datetime.datetime(y, mth, d, h, mnt)
+                    if dt >= cutoff:
+                        try:
+                            hdata = json.loads(hblob.download_as_string())
+                            historical_forecasts.append({'time': dt, 'data': hdata})
+                        except Exception as parse_e:
+                            pass
+
+            if historical_forecasts:
+                # Include the newly saved current forecast so it can be compared to past
+                historical_forecasts.append({'time': now_hst.replace(tzinfo=None), 'data': saved_data})
+                ci_data = calculate_ci_from_history(historical_forecasts)
+
+                # Save just the derived bounds
+                ci_blob = bucket.blob('confidence-intervals.json')
+                ci_blob.upload_from_string(json.dumps(ci_data), content_type='application/json')
+                app.logger.info(f"Successfully uploaded confidence intervals to gs://waikikiwx/confidence-intervals.json")
+
+        except Exception as ci_err:
+            app.logger.error(f"Failed to generate confidence intervals: {ci_err}")
+
         return jsonify({"status": "success", "file": f"gs://waikikiwx/{blob_path}"}), 200
 
     except Exception as e:
