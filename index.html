@@ -894,6 +894,10 @@ function drawChart(id, W, H, data, defaultMn, defaultMx, opts = {}) {
       min = Math.min(min, ...opts.overlayData);
       max = Math.max(max, ...opts.overlayData);
   }
+  if (opts.ciLower && opts.ciUpper) {
+      min = Math.min(min, ...opts.ciLower);
+      max = Math.max(max, ...opts.ciUpper);
+  }
   if (min === max) { min -= 1; max += 1; }
 
   // Custom domains for specific charts for better aesthetics
@@ -992,6 +996,25 @@ function drawChart(id, W, H, data, defaultMn, defaultMx, opts = {}) {
     });
   }
 
+  // Draw Confidence Interval Polygon
+  if (opts.ciLower && opts.ciUpper) {
+    const ciUpperLine = opts.ciUpper.map((v, i) => `${i === 0 ? 'M' : 'L'}${xp(i).toFixed(1)},${yp(v).toFixed(1)}`).join(' ');
+    // We reverse the lower line so we can close the polygon properly
+    const ciLowerLine = [...opts.ciLower].reverse().map((v, idx) => {
+      const i = N - 1 - idx;
+      return `L${xp(i).toFixed(1)},${yp(v).toFixed(1)}`;
+    }).join(' ');
+    const ciAreaD = `${ciUpperLine} ${ciLowerLine} Z`;
+
+    // Default opacity for CI is 0.2. Match the provided areaColor or lineColor
+    // We'll use areaColor but higher opacity, or parse lineColor
+    let ciFill = 'rgba(255, 255, 255, 0.1)';
+    if (opts.ciColor) {
+      ciFill = opts.ciColor;
+    }
+    svg.appendChild(svgEl('path', { d: ciAreaD, fill: ciFill, stroke: 'none' }));
+  }
+
   // Draw Data
   if (opts.bars) {
     const bW = (cW / N) * 0.7;
@@ -1019,10 +1042,14 @@ function drawChart(id, W, H, data, defaultMn, defaultMx, opts = {}) {
   } else {
     const lineD = data.map((v, i) =>
       `${i === 0 ? 'M' : 'L'}${xp(i).toFixed(1)},${yp(v).toFixed(1)}`).join(' ');
-    const areaD = lineD + ` L${xp(N-1).toFixed(1)},${PT + cH} L${xp(0).toFixed(1)},${PT + cH} Z`;
 
-    // Solid fill with opacity
-    svg.appendChild(svgEl('path', { d: areaD, fill: opts.areaColor || 'rgba(0,200,255,0.1)', stroke: 'none' }));
+    // Only draw the baseline area if we don't have CI, or if explicitly requested.
+    // The requirement explicitly states to replace the Wind speed baseline area with the CI area.
+    // We can conditionally draw the area. We'll skip it if `opts.hideBaselineArea` is true.
+    if (!opts.hideBaselineArea) {
+      const areaD = lineD + ` L${xp(N-1).toFixed(1)},${PT + cH} L${xp(0).toFixed(1)},${PT + cH} Z`;
+      svg.appendChild(svgEl('path', { d: areaD, fill: opts.areaColor || 'rgba(0,200,255,0.1)', stroke: 'none' }));
+    }
 
     // Optional overlay data (like apparent temp or gust)
     if (opts.overlayData) {
@@ -1108,7 +1135,12 @@ function renderAll(data) {
   const offsetGust = data.gust.map((v, i) => v === data.speed[i] ? v + 0.3 : v);
 
   drawChart('cTemp',   cW, cH, data.temp,   55, 85,
-    { lineColor:'#ff6b35', areaColor:'rgba(255,107,53,0.08)', overlayData: offsetApparent, overlayColor: '#ffaa88', xLabels, weekdayLabels, dayChangeIndices });
+    {
+      lineColor: '#ff6b35',
+      hideBaselineArea: true,
+      ciLower: data.temp_ci_lower, ciUpper: data.temp_ci_upper, ciColor: 'rgba(255,107,53,0.15)',
+      overlayData: offsetApparent, overlayColor: '#ffaa88', xLabels, weekdayLabels, dayChangeIndices
+    });
 
   // Calculate precip_in max for right axis scale
   let maxPrecipIn = Math.max(...data.precip_in, 0.5); // Fallback to 0.5 inches if all 0
@@ -1116,10 +1148,19 @@ function renderAll(data) {
   else maxPrecipIn = Math.ceil(maxPrecipIn); // e.g. 1.2 -> 2.0
 
   drawChart('cPrecip', cW, cH, data.precip,  0, 100,
-    { bars:true, textData: data.precip_in, rightAxisMax: maxPrecipIn, xLabels, weekdayLabels, dayChangeIndices });
+    {
+      bars: true, textData: data.precip_in, rightAxisMax: maxPrecipIn,
+      ciLower: data.precip_ci_lower, ciUpper: data.precip_ci_upper, ciColor: 'rgba(0,200,255,0.15)',
+      xLabels, weekdayLabels, dayChangeIndices
+    });
 
   drawChart('cWind',   cW, cH, data.speed,   0,  40,
-    { lineColor:'#39d98a', areaColor:'rgba(57,217,138,0.07)', overlayData: offsetGust, overlayColor: '#88ffbb', warnAt:35, xLabels, weekdayLabels, dayChangeIndices });
+    {
+      lineColor: '#39d98a',
+      hideBaselineArea: true,
+      ciLower: data.speed_ci_lower, ciUpper: data.speed_ci_upper, ciColor: 'rgba(57,217,138,0.15)',
+      overlayData: offsetGust, overlayColor: '#88ffbb', warnAt: 35, xLabels, weekdayLabels, dayChangeIndices
+    });
 }
 
 let currentData = null;
