@@ -1,9 +1,4 @@
-import json
-import os
-import re
-import requests
-import datetime
-import math
+import json, os, re, requests, datetime, math, collections
 from google.cloud import storage
 from flask import Flask, jsonify, send_from_directory, render_template, request, Response
 
@@ -38,9 +33,6 @@ def get_forecast_urls():
     _forecast_grid_data_url = props['forecastGridData']
     return _forecast_hourly_url, _forecast_grid_data_url
 
-import datetime
-import math
-
 WIND_SPEED_RE = re.compile(r'\d+')
 def parse_wind_speed(s):
     # "20 mph" or "15 to 20 mph" — take the higher number
@@ -69,8 +61,6 @@ def parse_iso8601_duration(d):
 
     total_hours = (days * 24) + hours
     return total_hours if total_hours > 0 else 1
-
-import collections
 
 def percentile(N, percent, key=lambda x:x):
     if not N:
