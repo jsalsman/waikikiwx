@@ -416,7 +416,9 @@ thead tr th { border-top: none; }
   <div class="hdr">
     <div>
       <div class="site-id">
-        <img class="loc-icon" id="loc-icon" alt="Current weather icon">
+        <a id="loc-icon-link" target="_blank" style="display: flex; align-items: center; text-decoration: none;">
+          <img class="loc-icon" id="loc-icon" alt="Current weather icon">
+        </a>
         <div class="loc">WAIKIKI</div>
         <div class="coords"><a href="https://waikikiwx.live" style="color: inherit; text-decoration: none;">WaikikiWX.live</a></div>
       </div>
@@ -1095,12 +1097,17 @@ function renderAll(data) {
 
   if (nowIcon) {
     const locIconEl = document.getElementById('loc-icon');
+    const locIconLinkEl = document.getElementById('loc-icon-link');
     const faviconEl = document.querySelector('link[rel="icon"]');
     
     const ts = Date.now();
     const proxyUrl = `/icon?url=${encodeURIComponent(nowIcon)}&t=${ts}`;
     locIconEl.src = proxyUrl;
     
+    if (locIconLinkEl) {
+      locIconLinkEl.href = `${nowIcon}${nowIcon.includes('?') ? '&' : '?'}t=${ts}`;
+    }
+
     if (faviconEl) {
       faviconEl.href = proxyUrl;
       faviconEl.type = 'image/png';
