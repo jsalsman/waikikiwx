@@ -25,4 +25,4 @@ RUN playwright install chromium
 
 COPY --chown=appuser:appuser app.py index.html screenshot.png daily_video.py ./
 EXPOSE 8080
-CMD ["python", "-m", "gunicorn", "--bind", "0.0.0.0:8080", "--workers", "3", "--timeout", "30", "app:app"]
+CMD ["python", "-m", "gunicorn", "-b", "0.0.0.0:8080", "-k", "gevent", "-w", "1", "app:app"]
