@@ -1105,7 +1105,7 @@ function renderAll(data) {
     locIconEl.src = proxyUrl;
     
     if (locIconLinkEl) {
-      locIconLinkEl.href = `${nowIcon}${nowIcon.includes('?') ? '&' : '?'}t=${ts}`;
+      locIconLinkEl.href = nowIcon;
     }
 
     if (faviconEl) {
