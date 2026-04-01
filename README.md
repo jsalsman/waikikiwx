@@ -98,3 +98,31 @@ The `index.html` template is intentionally a self-contained UI surface: Jinja in
 The `Dockerfile` packages the app for production in a minimal Python 3.14 slim image, prioritizing predictable startup and safer runtime defaults. It sets Python environment flags for cleaner container behavior, creates and runs as a non-root `appuser`, installs requirements in a cache-friendly layer, and copies only the files needed at runtime (`app.py`, `index.html`, `screenshot.png`). The container exposes port 8080 and starts Gunicorn with multiple workers and a bounded timeout, aligning with Cloud Run expectations while preserving a simple image build path that mirrors local behavior.
 
 `cloudbuild.yaml` defines the CI/CD pipeline from validation through deployment. The first step (`Smoketests`) runs inside `python:3.14-slim` and does more than a superficial ping: it compiles all Python files, creates a virtual environment, installs dependencies, starts the Flask development server, installs `curl`, and verifies that the homepage response contains an expected sentinel string (`and/or fork:`), failing fast with response diagnostics if not. After this gate passes, the pipeline builds a no-cache Docker image, pushes it to Artifact Registry, and updates the Cloud Run service in `us-west1` using commit-based image tags and deployment labels for traceability. That smoketests stage is therefore the quality gate that protects the deploy stages from shipping obviously broken application behavior.
+
+## Daily YouTube Shorts Automation
+
+A Python script (`daily_short.py`) is included to automate generating and uploading a 60-second YouTube Short of the live dashboard. The script leverages Playwright to record a headless session, FFmpeg to clip/format it into an MP4, and the YouTube API to upload it. It fetches OAuth credentials from Google Secret Manager to bypass Service Account upload restrictions.
+
+### Deployment as a Cloud Run Job
+
+To deploy this script as a Cloud Run Job to be run via Cloud Scheduler:
+
+```bash
+# Build and push the updated image (or let Cloud Build do it)
+# Deploy as a new Cloud Run Job:
+gcloud run jobs create waikikiwx-daily-short \
+  --image gcr.io/YOUR_PROJECT_ID/waikikiwx:latest \
+  --command "python" \
+  --args "daily_short.py" \
+  --region us-west1 \
+  --set-env-vars="GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID"
+```
+
+Then create a Cloud Scheduler trigger to run it daily:
+```bash
+gcloud scheduler jobs create http waikiki-short-trigger \
+  --schedule="0 8 * * *" \
+  --uri="https://us-west1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/YOUR_PROJECT_ID/jobs/waikikiwx-daily-short:run" \
+  --http-method POST \
+  --oauth-service-account-email="YOUR_SERVICE_ACCOUNT_EMAIL"
+```
