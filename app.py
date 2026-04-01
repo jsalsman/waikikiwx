@@ -1,4 +1,4 @@
-import json, os, re, requests, datetime, math, collections
+import json, os, re, requests, datetime, math, collections, tempfile, uuid
 from google.cloud import storage
 from flask import Flask, jsonify, send_from_directory, render_template, request, Response, stream_with_context
 import subprocess, time, signal
@@ -441,7 +441,6 @@ def live_stream():
         return "YouTube stream key not configured", 500
 
     def generate():
-        import tempfile
         log_lines = []
 
         def log_msg(msg):
@@ -479,7 +478,6 @@ def live_stream():
             yield log_msg(f"Initial Memory: {get_memory_status()}")
 
             yield log_msg("Starting Xvfb...")
-            import uuid
             # Use a random display port to allow concurrent executions
             display_num = str(uuid.uuid4().int % 10000 + 100)
             display = f":{display_num}"
