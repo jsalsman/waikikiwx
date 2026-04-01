@@ -441,6 +441,25 @@ def live_stream():
         return "YouTube stream key not configured", 500
 
     def generate():
+        import tempfile
+        log_lines = []
+
+        def log_msg(msg):
+            timestamp = datetime.datetime.now().isoformat()
+            line = f"[{timestamp}] {msg}"
+            app.logger.info(line)
+            log_lines.append(line)
+            return line + "\n"
+
+        def get_memory_status():
+            try:
+                with open('/proc/meminfo', 'r') as f:
+                    lines = f.readlines()
+                mem_info = {line.split(':')[0]: line.split(':')[1].strip() for line in lines if ':' in line}
+                return f"MemAvailable: {mem_info.get('MemAvailable', 'N/A')}, MemTotal: {mem_info.get('MemTotal', 'N/A')}"
+            except Exception as e:
+                return f"Memory check error: {e}"
+
         start_time = time.time()
         duration_seconds = duration_minutes * 60
 
@@ -450,36 +469,50 @@ def live_stream():
         playwright_browser = None
         ffmpeg_proc = None
 
+        xvfb_log_fd, xvfb_log_path = tempfile.mkstemp(prefix='xvfb_', suffix='.log')
+        os.close(xvfb_log_fd)
+        ffmpeg_log_fd, ffmpeg_log_path = tempfile.mkstemp(prefix='ffmpeg_', suffix='.log')
+        os.close(ffmpeg_log_fd)
+
         try:
-            yield "Starting Xvfb...\n"
+            yield log_msg("Starting live stream process")
+            yield log_msg(f"Initial Memory: {get_memory_status()}")
+
+            yield log_msg("Starting Xvfb...")
             import uuid
             # Use a random display port to allow concurrent executions
             display_num = str(uuid.uuid4().int % 10000 + 100)
             display = f":{display_num}"
-            xvfb_proc = subprocess.Popen(["Xvfb", display, "-screen", "0", "1920x1080x24"])
+            with open(xvfb_log_path, 'w') as xvfb_log_file:
+                xvfb_proc = subprocess.Popen(["Xvfb", display, "-screen", "0", "1920x1080x24"], stdout=xvfb_log_file, stderr=subprocess.STDOUT)
+
             time.sleep(1) # Wait for Xvfb to start
             if xvfb_proc.poll() is not None:
-                yield f"Failed to start Xvfb on {display}.\n"
+                yield log_msg(f"Failed to start Xvfb on {display}. Exit code: {xvfb_proc.returncode}")
                 return
 
             # Use a specific env dict for playwright rather than modifying global os.environ
             pw_env = os.environ.copy()
             pw_env["DISPLAY"] = display
 
-            yield "Starting Playwright...\n"
-            playwright_context_mgr = sync_playwright()
-            p = playwright_context_mgr.start()
-            playwright_browser = p.chromium.launch(headless=False, env=pw_env, args=['--window-size=1920,1080', '--window-position=0,0', '--no-sandbox'])
-            context = playwright_browser.new_context(viewport={"width": 1920, "height": 1080})
-            page = context.new_page()
+            yield log_msg("Starting Playwright...")
+            try:
+                playwright_context_mgr = sync_playwright()
+                p = playwright_context_mgr.start()
+                playwright_browser = p.chromium.launch(headless=False, env=pw_env, args=['--window-size=1920,1080', '--window-position=0,0', '--no-sandbox'])
+                context = playwright_browser.new_context(viewport={"width": 1920, "height": 1080})
+                page = context.new_page()
 
-            # Use local URL to capture the site directly
-            yield "Navigating to site...\n"
-            page.goto("http://127.0.0.1:8080/")
-            # Wait a few seconds for data to load and render
-            time.sleep(5)
+                # Use local URL to capture the site directly
+                yield log_msg("Navigating to site...")
+                page.goto("http://127.0.0.1:8080/")
+                # Wait a few seconds for data to load and render
+                time.sleep(5)
+            except Exception as pw_err:
+                yield log_msg(f"Playwright error: {pw_err}")
+                raise
 
-            yield "Starting FFmpeg stream...\n"
+            yield log_msg("Starting FFmpeg stream...")
             ffmpeg_cmd = [
                 "ffmpeg",
                 "-f", "x11grab",
@@ -500,22 +533,30 @@ def live_stream():
                 "-f", "flv",
                 f"rtmp://a.rtmp.youtube.com/live2/{stream_key}"
             ]
-            ffmpeg_proc = subprocess.Popen(ffmpeg_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+            with open(ffmpeg_log_path, 'w') as ffmpeg_log_file:
+                ffmpeg_proc = subprocess.Popen(ffmpeg_cmd, stdout=ffmpeg_log_file, stderr=subprocess.STDOUT)
 
-            yield f"Streaming for {duration_minutes} minutes...\n"
+            yield log_msg(f"Streaming for {duration_minutes} minutes...")
             while time.time() - start_time < duration_seconds:
                 if ffmpeg_proc.poll() is not None:
-                    yield "FFmpeg process exited unexpectedly.\n"
+                    yield log_msg(f"FFmpeg process exited unexpectedly with code: {ffmpeg_proc.returncode}")
                     break
-                yield f"Streaming... {int(time.time() - start_time)}s elapsed.\n"
+
+                elapsed = int(time.time() - start_time)
+                if elapsed % 60 < 5:  # Log memory every minute
+                    yield log_msg(f"Streaming... {elapsed}s elapsed. {get_memory_status()}")
+                else:
+                    yield log_msg(f"Streaming... {elapsed}s elapsed.")
                 time.sleep(5)
 
-            yield "Streaming completed successfully.\n"
+            yield log_msg("Streaming completed successfully.")
 
         except Exception as e:
-            app.logger.error(f"Error during live stream: {e}")
-            yield f"Error during streaming: {e}\n"
+            msg = f"Error during live stream: {e}"
+            app.logger.error(msg)
+            yield log_msg(msg)
         finally:
+            log_msg(f"Final Memory: {get_memory_status()}")
             if ffmpeg_proc and ffmpeg_proc.poll() is None:
                 ffmpeg_proc.terminate()
                 try:
@@ -538,6 +579,43 @@ def live_stream():
                     xvfb_proc.wait(timeout=5)
                 except subprocess.TimeoutExpired:
                     xvfb_proc.kill()
+
+            # Read and append log files
+            try:
+                with open(xvfb_log_path, 'r') as f:
+                    xvfb_out = f.read()
+                    log_lines.append("\n--- Xvfb Output ---\n")
+                    log_lines.append(xvfb_out if xvfb_out else "(No output)\n")
+            except Exception as e:
+                log_lines.append(f"\nError reading Xvfb log: {e}\n")
+
+            try:
+                with open(ffmpeg_log_path, 'r') as f:
+                    ffmpeg_out = f.read()
+                    log_lines.append("\n--- FFmpeg Output ---\n")
+                    log_lines.append(ffmpeg_out if ffmpeg_out else "(No output)\n")
+            except Exception as e:
+                log_lines.append(f"\nError reading FFmpeg log: {e}\n")
+
+            # Clean up temp files
+            for p in [xvfb_log_path, ffmpeg_log_path]:
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+
+            # Upload to GCS
+            try:
+                if not os.environ.get('GOOGLE_APPLICATION_CREDENTIALS') and not os.environ.get('KUBERNETES_SERVICE_HOST'):
+                    app.logger.warning("No GCS credentials, skipping log upload.")
+                else:
+                    client = storage.Client()
+                    bucket = client.bucket('waikikiwx')
+                    blob = bucket.blob('live-stream-results.txt')
+                    blob.upload_from_string("".join(log_lines), content_type='text/plain')
+                    app.logger.info("Successfully uploaded live-stream-results.txt to GCS")
+            except Exception as e:
+                app.logger.error(f"Failed to upload live-stream logs to GCS: {e}")
 
     response = Response(stream_with_context(generate()), mimetype='text/plain')
     response.headers['X-Accel-Buffering'] = 'no'
