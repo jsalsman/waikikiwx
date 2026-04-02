@@ -1,5 +1,4 @@
 import json, os, re, requests, datetime, math, collections, tempfile, uuid
-from flask import Flask, jsonify, send_from_directory, render_template,
 from google.cloud import storage
 from flask import Flask, jsonify, send_from_directory, render_template, request, Response, stream_with_context
 import subprocess, time, signal
