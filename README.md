@@ -47,6 +47,24 @@ Then open:
 - `http://127.0.0.1:8080/robots.txt` for crawler rules
 - `http://127.0.0.1:8080/cron/collect-forecast?key=YOUR_SECRET_KEY` for triggering the GCS forecast export
 
+## Live YouTube Streaming
+
+The dashboard supports live streaming directly to YouTube via RTMPS by using the standalone `stream.py` script.
+
+### Configuration
+1. Make sure you have Google Cloud Storage credentials configured (e.g. by running this on a GCE instance).
+2. Set the `YOUTUBE_STREAM_KEY` environment variable to your YouTube Live stream key.
+3. Install system dependencies for streaming (`ffmpeg`, `xvfb`) and python dependencies (`playwright`).
+4. Install playwright browsers: `playwright install chromium`
+
+### Automating with Cron
+To start a 1-minute live stream every 10 minutes, you can add an entry to your crontab:
+```bash
+*/10 * * * * export YOUTUBE_STREAM_KEY=YOUR_KEY; /path/to/venv/bin/python /path/to/stream.py --duration 1
+```
+
+The `stream.py` script starts an Xvfb virtual display, opens a Playwright browser window locally pointing to `https://waikikiwx.live/`, and uses FFmpeg to stream the visual display directly to the YouTube RTMPS endpoint. It will also concatenate all logs and upload them to `gs://waikikiwx/live-stream-results.txt`.
+
 ## Historical Data Collection
 
 The application includes a specialized endpoint (`/cron/collect-forecast?key=YOUR_SECRET_KEY`) designed to periodically save forecast snapshots to a Google Cloud Storage bucket (`waikikiwx`). This historical dataset will eventually be used to compute 50% confidence intervals for temperature, precipitation probability, and wind speed.
@@ -100,18 +118,3 @@ The `Dockerfile` packages the app for production in a minimal Python 3.14 slim i
 
 `cloudbuild.yaml` defines the CI/CD pipeline from validation through deployment. The first step (`Smoketests`) runs inside `python:3.14-slim` and does more than a superficial ping: it compiles all Python files, creates a virtual environment, installs dependencies, starts the Flask development server, installs `curl`, and verifies that the homepage response contains an expected sentinel string (`and/or fork:`), failing fast with response diagnostics if not. After this gate passes, the pipeline builds a no-cache Docker image, pushes it to Artifact Registry, and updates the Cloud Run service in `us-west1` using commit-based image tags and deployment labels for traceability. That smoketests stage is therefore the quality gate that protects the deploy stages from shipping obviously broken application behavior.
 
-## Live YouTube Streaming
-
-The dashboard supports live streaming directly to YouTube via RTMP.
-
-### Configuration
-1. Set the `YOUTUBE_STREAM_KEY` environment variable in your Google Cloud Run service to your YouTube Live stream key.
-2. Set the `COLLECT_FORECAST_KEY` environment variable as described in the Historical Data Collection section.
-
-### Automating with Cloud Scheduler
-To start a 1-minute live stream using Cloud Scheduler:
-1. Create a new Cloud Scheduler job.
-2. Set the frequency as desired (e.g., `0 8 * * *` for daily at 8:00 AM).
-3. Set the target type to HTTP and the URL to `https://waikikiwx.live/live-stream?cfkey=YOUR_SECRET_KEY&duration=1`.
-
-The `/live-stream` endpoint streams a status update back to the caller every 5 seconds to keep the HTTP connection alive while the streaming occurs in the background. It starts an Xvfb virtual display, opens a Playwright browser window locally, and uses FFmpeg to stream the visual display directly to the YouTube RTMP endpoint.
