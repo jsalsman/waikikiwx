@@ -502,15 +502,34 @@ def live_stream():
             pw_script_content = f"""
 from playwright.sync_api import sync_playwright
 import time
+import sys
+
+def on_console(msg):
+    print(f"BROWSER CONSOLE [{{msg.type}}]: {{msg.text}}", flush=True)
+
+def on_pageerror(err):
+    print(f"BROWSER ERROR: {{err}}", flush=True)
+
 try:
+    print("Playwright script starting...", flush=True)
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False, args=['--window-size=1920,1080', '--window-position=0,0', '--no-sandbox'])
+        print("Browser launched.", flush=True)
         context = browser.new_context(viewport={{"width": 1920, "height": 1080}})
         page = context.new_page()
-        page.goto("http://127.0.0.1:8080/")
+        
+        page.on("console", on_console)
+        page.on("pageerror", on_pageerror)
+        
+        print("Navigating to http://127.0.0.1:8080/...", flush=True)
+        response = page.goto("http://127.0.0.1:8080/")
+        print(f"Page loaded with status: {{response.status}}", flush=True)
+        print(f"Page title: {{page.title()}}", flush=True)
+        
+        print("Holding browser open for stream...", flush=True)
         time.sleep({duration_seconds + 300}) # Sleep long enough to cover the stream duration
 except Exception as e:
-    print("Playwright error:", e)
+    print("Playwright error:", e, flush=True)
 """
             with open(pw_script_path, "w") as f:
                 f.write(pw_script_content)
@@ -543,7 +562,7 @@ except Exception as e:
                 "-b:a", "128k",
                 "-ar", "44100",
                 "-f", "flv",
-                f"rtmp://a.rtmp.youtube.com/live2/{stream_key}"
+                f"rtmps://a.rtmp.youtube.com:443/live2/{stream_key}"
             ]
             with open(ffmpeg_log_path, 'w') as ffmpeg_log_file:
                 ffmpeg_proc = subprocess.Popen(ffmpeg_cmd, stdout=ffmpeg_log_file, stderr=subprocess.STDOUT)
