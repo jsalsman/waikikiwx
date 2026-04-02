@@ -1,8 +1,10 @@
-import json, os, re, requests, datetime, math, collections, tempfile, uuid
+import collections, datetime, json, math, os, re, requests, statistics, tempfile, uuid
 from google.cloud import storage
 from flask import Flask, jsonify, send_from_directory, render_template, request, Response, stream_with_context
 import subprocess, time, signal
 from playwright.sync_api import sync_playwright
+
+HST = datetime.timezone(datetime.timedelta(hours=-10))
 
 app = Flask(__name__, template_folder='.')
 
@@ -93,61 +95,146 @@ def get_target_times(start_dt, hours):
         prev_h = h
     return times
 
-def calculate_ci_from_history(historical_forecasts):
-    predictions_by_target = collections.defaultdict(list)
-    for hf in historical_forecasts:
-        f_time = hf['time']
-        data = hf['data']
-        hours = data.get('hour', [])
-        target_times = get_target_times(f_time, hours)
+def percentile(values, q):
+    vals = sorted(float(v) for v in values if v is not None)
+    if not vals:
+        return None
+    if q <= 0:
+        return vals[0]
+    if q >= 1:
+        return vals[-1]
+    pos = (len(vals) - 1) * q
+    lo = math.floor(pos)
+    hi = math.ceil(pos)
+    if lo == hi:
+        return vals[int(pos)]
+    frac = pos - lo
+    return vals[lo] * (1.0 - frac) + vals[hi] * frac
 
-        for i, t_time in enumerate(target_times):
-            temp_val = data['temp'][i] if i < len(data.get('temp', [])) else None
-            precip_val = data['precip'][i] if i < len(data.get('precip', [])) else None
-            speed_val = data['speed'][i] if i < len(data.get('speed', [])) else None
+def to_float(x):
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return None
 
-            predictions_by_target[t_time].append({
-                'fetch_time': f_time,
-                'lead_index': i,
-                'temp': temp_val,
-                'precip': precip_val,
-                'speed': speed_val,
-            })
+def build_proxy_observations_from_hour0(historical_forecasts):
+    """
+    Uses each later snapshot's lead-0/current-conditions value as the realized value
+    for that target time. This is a proxy. If you have a real observations feed,
+    pass observed_by_target into calculate_ci_from_history() instead.
+    """
+    observed_by_target = {}
+    for hf in sorted(historical_forecasts, key=lambda x: x["time"]):
+        data = hf["data"]
+        hours = data.get("hour", [])
+        target_times = get_target_times(hf["time"], hours)  # assumes this already exists
+        if not target_times:
+            continue
 
-    errors_by_lead = collections.defaultdict(lambda: {'temp': [], 'precip': [], 'speed': []})
+        t0 = target_times[0]
+        temp0 = to_float(data.get("temp", [None])[0] if len(data.get("temp", [])) > 0 else None)
+        precip0 = to_float(data.get("precip", [None])[0] if len(data.get("precip", [])) > 0 else None)
+        speed0 = to_float(data.get("speed", [None])[0] if len(data.get("speed", [])) > 0 else None)
 
-    for t_time, preds in predictions_by_target.items():
-        if not preds: continue
-        most_recent_pred = max(preds, key=lambda x: x['fetch_time'])
+        observed_by_target[t0] = {
+            "temp": temp0,
+            "precip": precip0,
+            "speed": speed0,
+        }
+    return observed_by_target
 
-        for p in preds:
-            if p == most_recent_pred:
+def neighbor_pool(errors_by_lead, lead_idx, var_name, min_samples, excluded_leads=None):
+    excluded_leads = excluded_leads or set()
+    for radius in (0, 1, 2, 4, 8, 47):
+        pooled = []
+        lo = max(0, lead_idx - radius)
+        hi = min(47, lead_idx + radius)
+        for j in range(lo, hi + 1):
+            if j in excluded_leads:
+                continue
+            pooled.extend(errors_by_lead[j][var_name])
+        if len(pooled) >= min_samples or radius == 47:
+            return pooled
+    return []
+
+def calculate_ci_from_history(historical_forecasts, observed_by_target=None, coverage=0.90, min_samples=50):
+    """
+    Returns residual quantiles by lead:
+        error_low/error_high = quantiles of (observed - forecast)
+
+    To build a prediction interval for a new forecast value f:
+        lower = f + error_low
+        upper = f + error_high
+
+    If observed_by_target is None, this uses later lead-0 values as a proxy for the
+    realized weather at each target time.
+    """
+    using_proxy_observations = observed_by_target is None
+    if observed_by_target is None:
+        observed_by_target = build_proxy_observations_from_hour0(historical_forecasts)
+
+    vars_ = ("temp", "precip", "speed")
+    errors_by_lead = collections.defaultdict(lambda: {v: [] for v in vars_})
+
+    for hf in sorted(historical_forecasts, key=lambda x: x["time"]):
+        f_time = hf["time"]
+        data = hf["data"]
+        hours = data.get("hour", [])
+        target_times = get_target_times(f_time, hours)  # assumes this already exists
+
+        for lead_idx, t_time in enumerate(target_times[:48]):
+            if using_proxy_observations and lead_idx == 0:
+                # Otherwise lead 0 would be tautologically perfect because it is also the proxy truth source.
                 continue
 
-            lead_idx = p['lead_index']
-            if p['temp'] is not None and most_recent_pred['temp'] is not None:
-                errors_by_lead[lead_idx]['temp'].append(p['temp'] - most_recent_pred['temp'])
-            if p['precip'] is not None and most_recent_pred['precip'] is not None:
-                errors_by_lead[lead_idx]['precip'].append(p['precip'] - most_recent_pred['precip'])
-            if p['speed'] is not None and most_recent_pred['speed'] is not None:
-                errors_by_lead[lead_idx]['speed'].append(p['speed'] - most_recent_pred['speed'])
+            obs = observed_by_target.get(t_time)
+            if not obs:
+                continue
 
+            for var_name in vars_:
+                forecast_values = data.get(var_name, [])
+                if lead_idx >= len(forecast_values):
+                    continue
+
+                forecast_val = to_float(forecast_values[lead_idx])
+                observed_val = to_float(obs.get(var_name))
+                if forecast_val is None or observed_val is None:
+                    continue
+
+                # Residual = realized - forecast
+                errors_by_lead[lead_idx][var_name].append(observed_val - forecast_val)
+
+    alpha = (1.0 - coverage) / 2.0
+    excluded_leads = {0} if using_proxy_observations else set()
     ci_bounds = {}
 
     for lead_idx in range(48):
-        lead_errors = errors_by_lead.get(lead_idx, {'temp': [], 'precip': [], 'speed': []})
+        row = {}
+        for var_name in vars_:
+            raw_errors = errors_by_lead[lead_idx][var_name]
 
-        ci_bounds[str(lead_idx)] = {
-            'temp_error_low': percentile(lead_errors['temp'], 0.25) or 0,
-            'temp_error_high': percentile(lead_errors['temp'], 0.75) or 0,
-            'precip_error_low': percentile(lead_errors['precip'], 0.25) or 0,
-            'precip_error_high': percentile(lead_errors['precip'], 0.75) or 0,
-            'speed_error_low': percentile(lead_errors['speed'], 0.25) or 0,
-            'speed_error_high': percentile(lead_errors['speed'], 0.75) or 0,
-        }
+            if using_proxy_observations and lead_idx == 0:
+                used_errors = []
+            else:
+                used_errors = (
+                    raw_errors
+                    if len(raw_errors) >= min_samples
+                    else neighbor_pool(errors_by_lead, lead_idx, var_name, min_samples, excluded_leads)
+                )
+
+            low = percentile(used_errors, alpha)
+            high = percentile(used_errors, 1.0 - alpha)
+
+            row[f"{var_name}_error_low"] = 0.0 if low is None else low
+            row[f"{var_name}_error_high"] = 0.0 if high is None else high
+            row[f"{var_name}_n"] = len(raw_errors)
+            row[f"{var_name}_n_used"] = len(used_errors)
+            row[f"{var_name}_bias"] = statistics.fmean(raw_errors) if raw_errors else 0.0
+            row[f"{var_name}_mae"] = statistics.fmean(abs(e) for e in raw_errors) if raw_errors else 0.0
+
+        ci_bounds[str(lead_idx)] = row
 
     return ci_bounds
-
 def map_grid_series_to_hourly(series_values, hourly_dts, converter=None):
     # series_values: [{'validTime': '2026-03-30T10:00:00+00:00/PT3H', 'value': 21.6}, ...]
     # hourly_dts: list of datetime objects (timezone-aware)
@@ -327,87 +414,82 @@ def get_goes_airmass_url(sector):
     latest = matches[-1]
     return latest if latest.startswith('http') else GOES_CDN_PREFIX + latest
 
-@app.route('/cron/collect-forecast')
+FORECAST_NAME_RE = re.compile(r"^forecast-(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})\.json$")
+
+def parse_forecast_blob_time(blob_name):
+    m = FORECAST_NAME_RE.match(blob_name)
+    if not m:
+        return None
+    y, mo, d, h, mi = map(int, m.groups())
+    return datetime.datetime(y, mo, d, h, mi, tzinfo=HST)
+
+@app.route("/cron/collect-forecast")
 def cron_collect_forecast():
-    # Require a simple API key query parameter to prevent unauthorized execution
-    expected_key = os.environ.get('COLLECT_FORECAST_KEY')
+    expected_key = os.environ.get("COLLECT_FORECAST_KEY")
     if not expected_key:
         app.logger.error("COLLECT_FORECAST_KEY environment variable is not set")
         return "Server misconfigured", 500
 
-    key = request.args.get('key')
-    if not key or key != expected_key:
+    if request.args.get("key") != expected_key:
         return "Unauthorized", 401
 
     try:
-        # Fetch the complete forecast dataset
         data = scrape_forecast()
-
-        # We only need specific fields for confidence intervals
         saved_data = {
-            'hour': data.get('hour', []),
-            'temp': data.get('temp', []),
-            'precip': data.get('precip', []),
-            'speed': data.get('speed', [])
+            "hour": data.get("hour", []),
+            "temp": data.get("temp", []),
+            "precip": data.get("precip", []),
+            "speed": data.get("speed", []),
         }
 
-        # Determine HST time (UTC - 10 hours)
-        hst = datetime.timezone(datetime.timedelta(hours=-10))
-        now_hst = datetime.datetime.now(hst)
+        now_hst = datetime.datetime.now(HST).replace(second=0, microsecond=0)
+        blob_path = f"forecast-{now_hst.strftime('%Y-%m-%d-%H-%M')}.json"
 
-        # Construct the GCS object path: forecast-YYYY-MM-DD-HH-MM.json
-        date_str = now_hst.strftime('%Y-%m-%d')
-        time_str = now_hst.strftime('%H-%M')
-        blob_path = f'forecast-{date_str}-{time_str}.json'
-
-        # Upload to Google Cloud Storage
         storage_client = storage.Client()
-        bucket = storage_client.bucket('waikikiwx')
-        blob = bucket.blob(blob_path)
+        bucket = storage_client.bucket("waikikiwx")
+        bucket.blob(blob_path).upload_from_string(
+            json.dumps(saved_data),
+            content_type="application/json",
+        )
+        app.logger.info("Uploaded gs://waikikiwx/%s", blob_path)
 
-        json_payload = json.dumps(saved_data)
-        blob.upload_from_string(json_payload, content_type='application/json')
+        cutoff = now_hst - datetime.timedelta(days=90)
+        historical_forecasts = []
 
-        app.logger.info(f"Successfully uploaded forecast to gs://waikikiwx/{blob_path}")
+        for hblob in bucket.list_blobs(prefix="forecast-"):
+            f_time = parse_forecast_blob_time(hblob.name)
+            if f_time is None or f_time < cutoff:
+                continue
 
-        # Now compute the confidence intervals
-        try:
-            blobs = list(bucket.list_blobs(prefix='forecast-'))
-            cutoff = datetime.datetime.now() - datetime.timedelta(days=90)
+            try:
+                hdata = json.loads(hblob.download_as_text())
+            except Exception as e:
+                app.logger.warning("Skipping unreadable blob %s: %s", hblob.name, e)
+                continue
 
-            historical_forecasts = []
-            for hblob in blobs:
-                m = re.match(r'forecast-(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})\.json', hblob.name)
-                if m:
-                    y, mth, d, h, mnt = map(int, m.groups())
-                    dt = datetime.datetime(y, mth, d, h, mnt)
-                    if dt >= cutoff:
-                        try:
-                            hdata = json.loads(hblob.download_as_string())
-                            historical_forecasts.append({'time': dt, 'data': hdata})
-                        except Exception as parse_e:
-                            pass
+            historical_forecasts.append({"time": f_time, "data": hdata})
 
-            if historical_forecasts:
-                # Include the newly saved current forecast so it can be compared to past
-                historical_forecasts.append({'time': now_hst.replace(tzinfo=None), 'data': saved_data})
-                ci_data = calculate_ci_from_history(historical_forecasts)
+        # The just-uploaded forecast is already in list_blobs(); do not append it again.
+        # If you later add a real observations feed, build observed_by_target and pass it here.
+        ci_data = calculate_ci_from_history(
+            historical_forecasts,
+            observed_by_target=None,
+            coverage=0.90,
+            min_samples=50,
+        )
 
-                # Save just the derived bounds
-                ci_blob = bucket.blob('confidence-intervals.json')
-                ci_blob.upload_from_string(json.dumps(ci_data), content_type='application/json')
-                app.logger.info(f"Successfully uploaded confidence intervals to gs://waikikiwx/confidence-intervals.json")
-
-        except Exception as ci_err:
-            app.logger.error(f"Failed to generate confidence intervals: {ci_err}")
+        bucket.blob("confidence-intervals.json").upload_from_string(
+            json.dumps(ci_data),
+            content_type="application/json",
+        )
+        app.logger.info("Uploaded gs://waikikiwx/confidence-intervals.json")
 
         return jsonify({"status": "success", "file": f"gs://waikikiwx/{blob_path}"}), 200
 
     except Exception as e:
         msg = f"Failed to collect and upload forecast: {e}"
-        app.logger.error(msg)
+        app.logger.exception(msg)
         return jsonify({"error": msg}), 500
-
 
 @app.route('/health-check')
 def health_check():
