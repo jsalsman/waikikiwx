@@ -4,7 +4,7 @@ Single-page live 48-hour weather forecast dashboard for Waikiki, Honolulu, Oahu,
 
 [![Try it on Google Cloud Run](https://img.shields.io/badge/Try_it_on_Google_Cloud_Run-darkgreen)](https://waikikiwx.live/)
 [![App health](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fwaikikiwx.live%2Fhealth-check&query=%24.status&label=App%20health&color=brightgreen&labelColor=indigo)](https://waikikiwx.live/health-check)
-[![Build status](https://img.shields.io/github/check-runs/jsalsman/waikikiwx/main?label=Build&labelColor=indigo)](https://github.com/jsalsman/waikikiwx)
+[![Build status](https://img.shields.io/github/check-runs/jsalsman/waikikiwx/main?label=Build&labelColor=indigo)](https://console.cloud.google.com/cloud-build/builds)
 [![Python version 3.14](https://img.shields.io/badge/Python-3.14-blue?logo=python)](https://www.python.org/downloads/)
 [![Flask version 3.1](https://img.shields.io/badge/Flask-3.1-black?logo=flask)](https://flask.palletsprojects.com/)
 [![MIT License](https://img.shields.io/badge/License-MIT-brightgreen)](https://opensource.org/licenses/MIT)
