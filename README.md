@@ -47,6 +47,32 @@ Then open:
 - `http://127.0.0.1:8080/robots.txt` for crawler rules
 - `http://127.0.0.1:8080/cron/collect-forecast?key=YOUR_SECRET_KEY` for triggering the GCS forecast export
 
+## Live YouTube Streaming
+
+The dashboard supports live streaming directly to YouTube via RTMPS by using the standalone `stream.py` script, which is designed to be deployed as a Google Cloud Run Job. This allows streaming to execute in a memory-isolated container without bloat or memory strain on the main web application instance.
+
+### Configuration and Deployment
+1. Build the stream image:
+   ```bash
+   docker build -f Dockerfile.stream -t gcr.io/waikikiwx/stream .
+   ```
+2. Push the image to Artifact Registry and deploy it as a Cloud Run Job.
+3. Configure the Cloud Run Job with:
+   - Memory: at least `2Gi` (streaming is memory-intensive).
+   - Service account that has write access to the `waikikiwx` GCS bucket.
+   - Environment variables:
+     - `YOUTUBE_STREAM_KEY`: Your YouTube Live stream key.
+     - `STREAM_DURATION_MINUTES`: Desired stream duration in minutes (e.g., `1.0`).
+
+### Automating with Cloud Scheduler
+To run the stream automatically every 10 minutes, set up a Cloud Scheduler trigger targeting the Cloud Run API to execute the Cloud Run Job:
+- Target type: HTTP
+- URL: `https://run.googleapis.com/v1/namespaces/YOUR_PROJECT_ID/jobs/YOUR_JOB_NAME:run`
+- HTTP method: POST
+- Auth header: OAuth token for a service account with `Cloud Run Invoker` permissions.
+
+The `stream.py` script starts an Xvfb virtual display, opens a Playwright browser window locally pointing to `https://waikikiwx.live/`, and uses FFmpeg to stream the visual display directly to the YouTube RTMPS endpoint. It will also concatenate all logs and upload them to `gs://waikikiwx/live-stream-results.txt`.
+
 ## Historical Data Collection
 
 The application includes a specialized endpoint (`/cron/collect-forecast?key=YOUR_SECRET_KEY`) designed to periodically save forecast snapshots to a Google Cloud Storage bucket (`waikikiwx`). This historical dataset will eventually be used to compute 50% confidence intervals for temperature, precipitation probability, and wind speed.
@@ -100,18 +126,3 @@ The `Dockerfile` packages the app for production in a minimal Python 3.14 slim i
 
 `cloudbuild.yaml` defines the CI/CD pipeline from validation through deployment. The first step (`Smoketests`) runs inside `python:3.14-slim` and does more than a superficial ping: it compiles all Python files, creates a virtual environment, installs dependencies, starts the Flask development server, installs `curl`, and verifies that the homepage response contains an expected sentinel string (`and/or fork:`), failing fast with response diagnostics if not. After this gate passes, the pipeline builds a no-cache Docker image, pushes it to Artifact Registry, and updates the Cloud Run service in `us-west1` using commit-based image tags and deployment labels for traceability. That smoketests stage is therefore the quality gate that protects the deploy stages from shipping obviously broken application behavior.
 
-## Live YouTube Streaming
-
-The dashboard supports live streaming directly to YouTube via RTMP.
-
-### Configuration
-1. Set the `YOUTUBE_STREAM_KEY` environment variable in your Google Cloud Run service to your YouTube Live stream key.
-2. Set the `COLLECT_FORECAST_KEY` environment variable as described in the Historical Data Collection section.
-
-### Automating with Cloud Scheduler
-To start a 1-minute live stream using Cloud Scheduler:
-1. Create a new Cloud Scheduler job.
-2. Set the frequency as desired (e.g., `0 8 * * *` for daily at 8:00 AM).
-3. Set the target type to HTTP and the URL to `https://waikikiwx.live/live-stream?cfkey=YOUR_SECRET_KEY&duration=1`.
-
-The `/live-stream` endpoint streams a status update back to the caller every 5 seconds to keep the HTTP connection alive while the streaming occurs in the background. It starts an Xvfb virtual display, opens a Playwright browser window locally, and uses FFmpeg to stream the visual display directly to the YouTube RTMP endpoint.

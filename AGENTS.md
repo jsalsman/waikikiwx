@@ -14,6 +14,9 @@ These instructions apply to the entire repository.
 3. Run comprehensive API test suite:
    - Execute `python -m unittest tests/test_app.py`
    - This suite covers all endpoints (`/`, `/forecast`, `/goes-airmass`, `/health-check`, `/icon`, `/screenshot.png`, `/robots.txt`) using `app.test_client()` and mocked external APIs.
+
+## Streaming to YouTube
+- Live streaming to YouTube is managed by a standalone python script `stream.py`. This script requires system dependencies (`ffmpeg`, `xvfb`) and `playwright`. A dedicated `Dockerfile.stream` is provided to package it for deployment as a Cloud Run Job, which should be triggered by Cloud Scheduler.
 4. Run comprehensive Playwright UI test suite:
    - Execute `python -m unittest tests/test_playwright.py`
    - This script runs a local server and uses Playwright to assert on key DOM elements (like `#loc-icon`, `#now-summary`, `.ftr-fork`, and the SVG IDs).
