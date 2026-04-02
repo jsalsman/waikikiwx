@@ -1,6 +1,6 @@
 import json, os, re, requests, datetime, math, collections, tempfile, uuid
-from google.cloud import storage
 from flask import Flask, jsonify, send_from_directory, render_template, request, Response, stream_with_context
+from google.cloud import storage
 import subprocess, time, signal
 from playwright.sync_api import sync_playwright
 
@@ -442,14 +442,14 @@ def live_stream():
 
     def generate():
         log_lines = []
-
+        
         def log_msg(msg):
             timestamp = datetime.datetime.now().isoformat()
             line = f"[{timestamp}] {msg}"
             app.logger.info(line)
             log_lines.append(line)
             return line + "\n"
-
+            
         def get_memory_status():
             try:
                 with open('/proc/meminfo', 'r') as f:
@@ -467,7 +467,7 @@ def live_stream():
         playwright_context_mgr = None
         playwright_browser = None
         ffmpeg_proc = None
-
+        
         xvfb_log_fd, xvfb_log_path = tempfile.mkstemp(prefix='xvfb_', suffix='.log')
         os.close(xvfb_log_fd)
         ffmpeg_log_fd, ffmpeg_log_path = tempfile.mkstemp(prefix='ffmpeg_', suffix='.log')
@@ -476,14 +476,14 @@ def live_stream():
         try:
             yield log_msg("Starting live stream process")
             yield log_msg(f"Initial Memory: {get_memory_status()}")
-
+            
             yield log_msg("Starting Xvfb...")
             # Use a random display port to allow concurrent executions
             display_num = str(uuid.uuid4().int % 10000 + 100)
             display = f":{display_num}"
             with open(xvfb_log_path, 'w') as xvfb_log_file:
                 xvfb_proc = subprocess.Popen(["Xvfb", display, "-screen", "0", "1920x1080x24"], stdout=xvfb_log_file, stderr=subprocess.STDOUT)
-
+            
             time.sleep(1) # Wait for Xvfb to start
             if xvfb_proc.poll() is not None:
                 yield log_msg(f"Failed to start Xvfb on {display}. Exit code: {xvfb_proc.returncode}")
@@ -539,7 +539,10 @@ def live_stream():
                 if ffmpeg_proc.poll() is not None:
                     yield log_msg(f"FFmpeg process exited unexpectedly with code: {ffmpeg_proc.returncode}")
                     break
-
+                if xvfb_proc.poll() is not None:
+                    yield log_msg(f"Xvfb process exited unexpectedly with code: {xvfb_proc.returncode}")
+                    break
+                
                 elapsed = int(time.time() - start_time)
                 if elapsed % 60 < 5:  # Log memory every minute
                     yield log_msg(f"Streaming... {elapsed}s elapsed. {get_memory_status()}")
@@ -547,7 +550,8 @@ def live_stream():
                     yield log_msg(f"Streaming... {elapsed}s elapsed.")
                 time.sleep(5)
 
-            yield log_msg("Streaming completed successfully.")
+            if xvfb_proc.poll() is None and ffmpeg_proc.poll() is None:
+                yield log_msg("Streaming completed successfully.")
 
         except Exception as e:
             msg = f"Error during live stream: {e}"
@@ -555,29 +559,40 @@ def live_stream():
             yield log_msg(msg)
         finally:
             log_msg(f"Final Memory: {get_memory_status()}")
-            if ffmpeg_proc and ffmpeg_proc.poll() is None:
-                ffmpeg_proc.terminate()
-                try:
-                    ffmpeg_proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    ffmpeg_proc.kill()
+            if ffmpeg_proc:
+                if ffmpeg_proc.poll() is None:
+                    ffmpeg_proc.terminate()
+                    try:
+                        ffmpeg_proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        ffmpeg_proc.kill()
+                        ffmpeg_proc.wait()
+                log_msg(f"FFmpeg final exit code: {ffmpeg_proc.returncode}")
+                
             if playwright_browser:
                 try:
                     playwright_browser.close()
-                except:
-                    pass
+                    log_msg("Playwright browser closed.")
+                except Exception as e:
+                    log_msg(f"Error closing Playwright browser: {e}")
+                    
             if playwright_context_mgr:
                 try:
                     playwright_context_mgr.stop()
-                except:
-                    pass
-            if xvfb_proc and xvfb_proc.poll() is None:
-                xvfb_proc.terminate()
-                try:
-                    xvfb_proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    xvfb_proc.kill()
-
+                    log_msg("Playwright context manager stopped.")
+                except Exception as e:
+                    log_msg(f"Error stopping Playwright context manager: {e}")
+                    
+            if xvfb_proc:
+                if xvfb_proc.poll() is None:
+                    xvfb_proc.terminate()
+                    try:
+                        xvfb_proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        xvfb_proc.kill()
+                        xvfb_proc.wait()
+                log_msg(f"Xvfb final exit code: {xvfb_proc.returncode}")
+            
             # Read and append log files
             try:
                 with open(xvfb_log_path, 'r') as f:
@@ -586,7 +601,7 @@ def live_stream():
                     log_lines.append(xvfb_out if xvfb_out else "(No output)\n")
             except Exception as e:
                 log_lines.append(f"\nError reading Xvfb log: {e}\n")
-
+            
             try:
                 with open(ffmpeg_log_path, 'r') as f:
                     ffmpeg_out = f.read()
@@ -601,17 +616,14 @@ def live_stream():
                     os.remove(p)
                 except OSError:
                     pass
-
+            
             # Upload to GCS
             try:
-                if not os.environ.get('GOOGLE_APPLICATION_CREDENTIALS') and not os.environ.get('KUBERNETES_SERVICE_HOST'):
-                    app.logger.warning("No GCS credentials, skipping log upload.")
-                else:
-                    client = storage.Client()
-                    bucket = client.bucket('waikikiwx')
-                    blob = bucket.blob('live-stream-results.txt')
-                    blob.upload_from_string("".join(log_lines), content_type='text/plain')
-                    app.logger.info("Successfully uploaded live-stream-results.txt to GCS")
+                client = storage.Client()
+                bucket = client.bucket('waikikiwx')
+                blob = bucket.blob('live-stream-results.txt')
+                blob.upload_from_string("".join(log_lines), content_type='text/plain')
+                app.logger.info("Successfully uploaded live-stream-results.txt to GCS")
             except Exception as e:
                 app.logger.error(f"Failed to upload live-stream logs to GCS: {e}")
 
