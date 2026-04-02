@@ -2,9 +2,6 @@ FROM python:3.14-slim
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 
-# Install system dependencies (ffmpeg, xvfb, and playwright browser dependencies)
-RUN apt-get update && apt-get install -y ffmpeg xvfb && rm -rf /var/lib/apt/lists/*
-
 # Create non-root user 
 RUN useradd --create-home --no-log-init appuser
 
@@ -12,17 +9,11 @@ RUN useradd --create-home --no-log-init appuser
 COPY requirements.txt ./
 RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
-# Install Playwright browser dependencies (requires root)
-RUN playwright install-deps chromium
-
-# Grant appuser permissions to the working directory so daily_short.py can save video files
+# Grant appuser permissions to the working directory
 RUN chown -R appuser:appuser /app
 
 USER appuser
 
-# Install Playwright browsers (as appuser)
-RUN playwright install chromium
-
 COPY --chown=appuser:appuser app.py index.html screenshot.png ./
 EXPOSE 8080
-CMD ["python", "-m", "gunicorn", "-b", "0.0.0.0:8080", "-k", "gevent", "-w", "1", "app:app"]
+CMD ["python", "-m", "gunicorn", "-b", "0.0.0.0:8080", "-w", "3", "app:app"]

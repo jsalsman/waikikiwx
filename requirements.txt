@@ -2,5 +2,3 @@ flask
 requests
 gunicorn
 google-cloud-storage
-playwright
-gevent
