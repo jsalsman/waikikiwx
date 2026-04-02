@@ -1,6 +1,7 @@
 import json, os, re, requests, datetime, math, collections, tempfile, uuid
-from flask import Flask, jsonify, send_from_directory, render_template, request, Response, stream_with_context
+from flask import Flask, jsonify, send_from_directory, render_template,
 from google.cloud import storage
+from flask import Flask, jsonify, send_from_directory, render_template, request, Response, stream_with_context
 import subprocess, time, signal
 from playwright.sync_api import sync_playwright
 
@@ -464,14 +465,17 @@ def live_stream():
 
         # We will set up Xvfb, Playwright, and FFmpeg
         xvfb_proc = None
-        playwright_context_mgr = None
-        playwright_browser = None
+        playwright_proc = None
         ffmpeg_proc = None
         
         xvfb_log_fd, xvfb_log_path = tempfile.mkstemp(prefix='xvfb_', suffix='.log')
         os.close(xvfb_log_fd)
         ffmpeg_log_fd, ffmpeg_log_path = tempfile.mkstemp(prefix='ffmpeg_', suffix='.log')
         os.close(ffmpeg_log_fd)
+        pw_script_fd, pw_script_path = tempfile.mkstemp(prefix='pw_script_', suffix='.py')
+        os.close(pw_script_fd)
+        pw_log_fd, pw_log_path = tempfile.mkstemp(prefix='pw_log_', suffix='.log')
+        os.close(pw_log_fd)
 
         try:
             yield log_msg("Starting live stream process")
@@ -493,21 +497,32 @@ def live_stream():
             pw_env = os.environ.copy()
             pw_env["DISPLAY"] = display
 
-            yield log_msg("Starting Playwright...")
-            try:
-                playwright_context_mgr = sync_playwright()
-                p = playwright_context_mgr.start()
-                playwright_browser = p.chromium.launch(headless=False, env=pw_env, args=['--window-size=1920,1080', '--window-position=0,0', '--no-sandbox'])
-                context = playwright_browser.new_context(viewport={"width": 1920, "height": 1080})
-                page = context.new_page()
+            yield log_msg("Starting Playwright (isolated process)...")
+            
+            # Write a standalone script to avoid async loop conflict
+            pw_script_content = f"""
+from playwright.sync_api import sync_playwright
+import time
+try:
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False, args=['--window-size=1920,1080', '--window-position=0,0', '--no-sandbox'])
+        context = browser.new_context(viewport={{"width": 1920, "height": 1080}})
+        page = context.new_page()
+        page.goto("http://127.0.0.1:8080/")
+        time.sleep({duration_seconds + 300}) # Sleep long enough to cover the stream duration
+except Exception as e:
+    print("Playwright error:", e)
+"""
+            with open(pw_script_path, "w") as f:
+                f.write(pw_script_content)
 
-                # Use local URL to capture the site directly
-                yield log_msg("Navigating to site...")
-                page.goto("http://127.0.0.1:8080/")
+            try:
+                with open(pw_log_path, "w") as pw_log_file:
+                    playwright_proc = subprocess.Popen(["python", pw_script_path], env=pw_env, stdout=pw_log_file, stderr=subprocess.STDOUT)
                 # Wait a few seconds for data to load and render
                 time.sleep(5)
             except Exception as pw_err:
-                yield log_msg(f"Playwright error: {pw_err}")
+                yield log_msg(f"Playwright subprocess launch error: {pw_err}")
                 raise
 
             yield log_msg("Starting FFmpeg stream...")
@@ -569,19 +584,15 @@ def live_stream():
                         ffmpeg_proc.wait()
                 log_msg(f"FFmpeg final exit code: {ffmpeg_proc.returncode}")
                 
-            if playwright_browser:
-                try:
-                    playwright_browser.close()
-                    log_msg("Playwright browser closed.")
-                except Exception as e:
-                    log_msg(f"Error closing Playwright browser: {e}")
-                    
-            if playwright_context_mgr:
-                try:
-                    playwright_context_mgr.stop()
-                    log_msg("Playwright context manager stopped.")
-                except Exception as e:
-                    log_msg(f"Error stopping Playwright context manager: {e}")
+            if playwright_proc:
+                if playwright_proc.poll() is None:
+                    playwright_proc.terminate()
+                    try:
+                        playwright_proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        playwright_proc.kill()
+                        playwright_proc.wait()
+                log_msg(f"Playwright final exit code: {playwright_proc.returncode}")
                     
             if xvfb_proc:
                 if xvfb_proc.poll() is None:
@@ -609,9 +620,17 @@ def live_stream():
                     log_lines.append(ffmpeg_out if ffmpeg_out else "(No output)\n")
             except Exception as e:
                 log_lines.append(f"\nError reading FFmpeg log: {e}\n")
+                
+            try:
+                with open(pw_log_path, 'r') as f:
+                    pw_out = f.read()
+                    log_lines.append("\n--- Playwright Output ---\n")
+                    log_lines.append(pw_out if pw_out else "(No output)\n")
+            except Exception as e:
+                log_lines.append(f"\nError reading Playwright log: {e}\n")
 
             # Clean up temp files
-            for p in [xvfb_log_path, ffmpeg_log_path]:
+            for p in [xvfb_log_path, ffmpeg_log_path, pw_script_path, pw_log_path]:
                 try:
                     os.remove(p)
                 except OSError:
@@ -696,3 +715,4 @@ def fetch_icon():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
+
