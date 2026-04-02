@@ -1,5 +1,3 @@
-intentional syntax error # screw up checks and build
-
 import collections, datetime, json, math, os, re, requests, statistics, tempfile, uuid
 from google.cloud import storage
 from flask import Flask, jsonify, send_from_directory, render_template, request, Response, stream_with_context
