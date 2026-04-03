@@ -853,15 +853,48 @@ function updateMarkers(sector) {
     dotLeft = 0.35; dotTop = 0.48;
   }
 
+  // --- TEMPORARY GRID OVERLAY ---
+  //
+  // This grid is temporarily added to visually assist in fine-tuning
+  // the base coordinate values (dotLeft, dotTop) for each sector.
+  // Once the proper coordinates are determined, this block should be
+  // reverted to just set the position of the single 'goes-dot' element.
   const markerLayer = document.getElementById(`goes-marker-layer-${sector}`);
   if (markerLayer) {
+    // Clear any existing dots (except the original one, or we can just clear all and recreate)
     markerLayer.innerHTML = '';
+
+    const offsets = [-0.05, -0.025, 0, 0.025, 0.05];
+
+    // Horizontal axis
+    offsets.forEach(offset => {
+      if (offset === 0) return; // Will add center dot later
+      const dot = document.createElement('div');
+      dot.className = 'goes-dot';
+      dot.style.left = `${offsetX + (dotLeft + offset) * renderWidth}px`;
+      dot.style.top = `${offsetY + dotTop * renderHeight}px`;
+      markerLayer.appendChild(dot);
+    });
+
+    // Vertical axis
+    offsets.forEach(offset => {
+      if (offset === 0) return; // Will add center dot later
+      const dot = document.createElement('div');
+      dot.className = 'goes-dot';
+      dot.style.left = `${offsetX + dotLeft * renderWidth}px`;
+      dot.style.top = `${offsetY + (dotTop + offset) * renderHeight}px`;
+      markerLayer.appendChild(dot);
+    });
+
+    // Center dot
     const centerDot = document.createElement('div');
     centerDot.className = 'goes-dot';
+    centerDot.id = 'goes-dot';
     centerDot.style.left = `${offsetX + dotLeft * renderWidth}px`;
     centerDot.style.top = `${offsetY + dotTop * renderHeight}px`;
     markerLayer.appendChild(centerDot);
   }
+  // --- END TEMPORARY GRID OVERLAY ---
 }
 
 // ── SVG CHARTS ────────────────────────────────────────────────
