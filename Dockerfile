@@ -4,15 +4,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 
 # Create non-root user 
 RUN useradd --create-home --no-log-init appuser
+# Grant appuser permissions to the working directory
+RUN chown -R appuser:appuser /app
+USER appuser
 
 # Install dependencies for a separate cacheable docker layer
 COPY requirements.txt ./
 RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
-
-# Grant appuser permissions to the working directory
-RUN chown -R appuser:appuser /app
-
-USER appuser
 
 COPY --chown=appuser:appuser app.py index.html screenshot.png ./
 EXPOSE 8080
