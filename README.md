@@ -94,6 +94,35 @@ To automate this collection using [Google Cloud Scheduler](https://cloud.google.
 
 The endpoint saves a JSON file for each execution at `gs://waikikiwx/forecast-YYYY-MM-DD-HH-MM.json` (using Hawaii-Aleutian Standard Time). See https://storage.googleapis.com/waikikiwx/ for a listing in XML.
 
+### Forecast Confidence Intervals
+
+The historical dataset collected by the `/cron/collect-forecast` endpoint is used to compute historical forecast errors and generate 50% confidence bounds for temperature, precipitation probability, and wind speed.
+
+#### Statistical Goals and Assumptions
+
+The statistical goal is to quantify the historical uncertainty of the weather forecast at each lead time (0 to 47 hours ahead). By analyzing past forecast errors, the system provides users with a realistic prediction interval alongside the deterministic forecast, allowing them to gauge the reliability of the predicted conditions.
+
+The method assumes:
+1. **Proxy Observations:** In the absence of a verified, real-time observational data feed, the analysis uses the *lead-0 (current conditions)* values from subsequent forecast snapshots as the "realized" proxy truth for that target hour.
+2. **Persistence of Error Distributions:** The distribution of forecast errors (observed minus forecasted) from the recent past (last 90 days) is representative of the expected errors for current forecasts.
+
+#### Data Structure and Meaning
+
+During each run of `/cron/collect-forecast`, the script calculates the 50% confidence intervals (the 25th and 75th percentiles of the error distribution) for each of the 48 lead hours. The result is saved to [`gs://waikikiwx/confidence-intervals.json`](https://storage.googleapis.com/waikikiwx/confidence-intervals.json).
+
+The resulting JSON file contains a dictionary keyed by the lead hour index (0 to 47). Each hour contains three sets of error bounds corresponding to the three forecast variables:
+- `temp_error_low`, `temp_error_high`
+- `precip_error_low`, `precip_error_high`
+- `speed_error_low`, `speed_error_high`
+
+A 50% confidence interval means there is a 50% probability that the actual weather outcome will fall within these bounds, based on historical error distributions. If a specific lead hour does not have a minimum number of samples (e.g., 50), the system dynamically pools errors from neighboring lead times to ensure a robust distribution.
+
+#### Visualization
+
+The confidence intervals are downloaded by the backend and merged into the `/forecast` API payload as `*_ci_lower` and `*_ci_upper` arrays.
+
+On the front end, these intervals are plotted as shaded regions on the SVG graphs. The graphing function overlays a semi-transparent band bounded by the lower and upper confidence limits. This shaded area gives users an immediate visual indication of the forecast's confidence level—a wider shaded band signifies higher uncertainty, while a narrow band indicates high confidence based on recent historical performance.
+
 ## Quick validation checklist
 
 1. Start app and request `/forecast`; confirm JSON includes:
@@ -133,4 +162,3 @@ The `Dockerfile` packages the app for production in a minimal Python 3.14 slim i
 `cloudbuild.yaml` defines the CI/CD pipeline from validation through deployment. The first step (`Smoketests`) runs inside `python:3.14-slim` and does more than a superficial ping: it compiles all Python files, creates a virtual environment, installs dependencies, starts the Flask development server, installs `curl`, and verifies that the homepage response contains an expected sentinel string (`and/or fork:`), failing fast with response diagnostics if not. After this gate passes, the pipeline builds a no-cache Docker image, pushes it to Artifact Registry, and updates the Cloud Run service in `us-west1` using commit-based image tags and deployment labels for traceability. That smoketests stage is therefore the quality gate that protects the deploy stages from shipping obviously broken application behavior.
 
 `stream.py` is a standalone utility isolated from the main application to handle continuous live streaming. It launches an Xvfb virtual display to simulate a desktop environment and runs a headless Chromium browser via Playwright Sync API to load the live dashboard (`https://waikikiwx.live/`). It then leverages FFmpeg to capture the X11 screen buffer and stream it as an RTMPS feed to YouTube Live. It handles robust isolation for these subprocesses, monitors memory usage over its execution window to prevent OOM errors, and uploads the aggregate execution and subprocess logs to a Google Cloud Storage bucket ([`gs://waikikiwx/live-stream-results.txt`](https://storage.googleapis.com/waikikiwx/live-stream-results.txt)) for later inspection. This separation of concerns ensures that heavy video-encoding tasks do not degrade the performance of the main web application.
-
