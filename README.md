@@ -1,4 +1,4 @@
-# WaikikiWX
+# waikikiwx
 
 Single-page live 48-hour weather forecast dashboard for Waikiki, Honolulu, Oahu, Hawaii.
 
