@@ -403,6 +403,7 @@ thead tr th { border-top: none; }
   .ftr { min-height: 3.4em; flex-wrap: wrap; height: auto; }
   .site-id { margin-bottom: 0.2em; }
   .now-summary { margin-bottom: 0.2em; }
+  .now-grid { gap: 1em; }
 }
 </style>
 </head>
@@ -961,7 +962,7 @@ function drawChart(id, W, H, data, defaultMn, defaultMx, opts = {}) {
       stroke: 'rgba(255,255,255,0.08)', 'stroke-width': 1
     }));
     // Label
-    svgTxt(svg, tick, PL - 8, y + 4, 11, '#9bb7d3', 'end');
+    svgTxt(svg, tick, PL - 8, y + 4, "var(--fs)", '#9bb7d3', 'end');
   });
 
   // Secondary Y-axis for inches of precipitation
@@ -972,7 +973,7 @@ function drawChart(id, W, H, data, defaultMn, defaultMx, opts = {}) {
     rTicks.forEach(tick => {
       // mapping tick to pixel height
       const y = PT + cH - (tick / (rMax || 1)) * cH;
-      svgTxt(svg, tick.toFixed(1), W - PR + 4, y + 4, 11, '#9bb7d3', 'start');
+      svgTxt(svg, tick.toFixed(1), W - PR + 4, y + 4, "var(--fs)", '#9bb7d3', 'start');
     });
   }
 
@@ -997,7 +998,7 @@ function drawChart(id, W, H, data, defaultMn, defaultMx, opts = {}) {
 
     opts.xLabels.forEach((lbl, i) => {
       if (lbl && (i % xStep === 0 || i === N - 1)) {
-        svgTxt(svg, lbl, xp(i), H - 4, 10, '#9bb7d3');
+        svgTxt(svg, lbl, xp(i), H - 4, "var(--fs)", '#9bb7d3');
       }
     });
   }
@@ -1006,7 +1007,7 @@ function drawChart(id, W, H, data, defaultMn, defaultMx, opts = {}) {
   if (opts.weekdayLabels) {
     opts.weekdayLabels.forEach((lbl, i) => {
       if (lbl) {
-        svgTxt(svg, lbl, xp(i), 12, 10, '#9bb7d3');
+        svgTxt(svg, lbl, xp(i), 12, "var(--fs)", '#9bb7d3');
       }
     });
   }
@@ -1049,7 +1050,7 @@ function drawChart(id, W, H, data, defaultMn, defaultMx, opts = {}) {
         // If we just want text positioned roughly at the bar top or at the scaled rightY:
         // We'll place it slightly above the bar y or rightY, whichever makes more sense
         // To be visually aligned with the right axis, we should position it at rightY
-        svgTxt(svg, opts.textData[i].toFixed(2), x + bW / 2, rightY - 4, 9, '#ffffff', 'middle');
+        svgTxt(svg, opts.textData[i].toFixed(2), x + bW / 2, rightY - 4, "calc(var(--fs) * 0.9)", '#ffffff', 'middle');
         // Let's add a small dashed line or dot so they know where the value is
         svg.appendChild(svgEl('circle', { cx: x + bW / 2, cy: rightY, r: 2, fill: '#ffffff', opacity: 0.8 }));
       }
