@@ -16,7 +16,7 @@ These instructions apply to the entire repository.
    - This suite covers all endpoints (`/`, `/forecast`, `/goes-airmass`, `/health-check`, `/icon`, `/screenshot.png`, `/robots.txt`) using `app.test_client()` and mocked external APIs.
 
 ## Streaming to YouTube
-- Live streaming to YouTube is managed by a standalone python script `stream.py`. This script requires system dependencies (`ffmpeg`, `xvfb`) and `playwright`.
+- Live streaming to YouTube is managed by a standalone python script `stream.py`. This script is meant to be packaged into a container and run as a periodic Cloud Run Job. It requires system dependencies (`ffmpeg`, `xvfb`), `playwright`, and at least 2GB of memory.
 4. Run comprehensive Playwright UI test suite:
    - Execute `python -m unittest tests/test_playwright.py`
    - This script runs a local server and uses Playwright to assert on key DOM elements (like `#loc-icon`, `#now-summary`, `.ftr-fork`, and the SVG IDs).
