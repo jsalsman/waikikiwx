@@ -1,4 +1,4 @@
-# waikikiwx
+# WaikikiWX
 
 Single-page live 48-hour weather forecast dashboard for Waikiki, Honolulu, Oahu, Hawaii.
 
@@ -53,14 +53,25 @@ Then open:
 The dashboard supports live streaming directly to YouTube via RTMPS by using the standalone `stream.py` script.
 
 ### Executing as a Cloud Run Job
-To run the live stream automatically without managing infrastructure, you can package `stream.py` and its dependencies (like `ffmpeg`, `xvfb`, and `playwright`) into a container image and deploy it as a Cloud Run Job.
+To run the live stream automatically without managing infrastructure, you can package `stream.py` and its dependencies into a container image and deploy it as a Cloud Run Job. Note that running an isolated headless browser and FFmpeg encoding is resource-intensive; the Job requires at least **2GB of memory**.
 
-1. Build a container image using a custom Dockerfile that installs system dependencies, Playwright browsers, and copies `stream.py`.
+1. Build a container image using a custom Dockerfile that installs system dependencies (`ffmpeg`, `xvfb`), Playwright browsers, and copies `stream.py`. An example `stream.Dockerfile` might look like this:
+
+```dockerfile
+FROM mcr.microsoft.com/playwright/python:v1.42.0-jammy
+WORKDIR /app
+RUN apt-get update && apt-get install -y ffmpeg xvfb && rm -rf /var/lib/apt/lists/*
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt playwright google-cloud-storage
+COPY stream.py ./
+CMD ["python", "stream.py", "--duration", "1"]
+```
+
 2. Push the image to Google Artifact Registry.
 3. Create a Cloud Run Job using the pushed image:
+   - Allocate at least **2GB of memory** for the execution environment.
    - Configure the job to run with the `YOUTUBE_STREAM_KEY` environment variable set to your YouTube Live stream key.
    - Ensure the service account running the job has write access to the `waikikiwx` Google Cloud Storage bucket so it can save logs.
-   - Set the command or entrypoint to execute `stream.py` with any desired arguments, e.g., `--duration 1`.
 4. Create a Google Cloud Scheduler job to trigger your Cloud Run Job periodically.
    - Set the frequency to every 10 minutes (e.g., `*/10 * * * *`).
    - Set the target type to "Cloud Run Job" or configure an HTTP target pointing to the regional Cloud Run Jobs trigger endpoint.
@@ -107,6 +118,7 @@ waikikiwx/
 │   ├── test_app.py         # Backend/unit-style endpoint coverage using Flask test_client + API mocking
 │   └── test_playwright.py  # End-to-end Playwright UI validation with screenshot/video artifacts
 ├── screenshot.png          # Open Graph/social preview image served by the app
+├── stream.py               # Standalone script for live streaming dashboard to YouTube
 ├── LICENSE                 # MIT license terms for project usage and distribution
 ├── README.md               # Project overview, usage, validation steps, and architecture notes
 └── AGENTS.md               # Repository automation instructions used by development agents
@@ -116,7 +128,9 @@ waikikiwx/
 
 The `index.html` template is intentionally a self-contained UI surface: Jinja injects initial forecast data while vanilla JavaScript performs refresh/update behavior, DOM binding, icon updates, GOES overlay swapping, and SVG graph drawing without any framework dependency. Its CSS uses a responsive, terminal-inspired layout with flexbox, viewport-aware scaling variables, and explicit mobile portrait behavior so the same document works on phones, tablets, and desktop displays. The page combines four stacked forecast table blocks, three chart panels, and a dynamic “now” status strip, while also managing favicon updates and weather icon rendering for immediate visual context. In short, this file is both the view layer and the client runtime for the dashboard.
 
-The `Dockerfile` packages the app for production in a minimal Python 3.14 slim image, prioritizing predictable startup and safer runtime defaults. It sets Python environment flags for cleaner container behavior, creates and runs as a non-root `appuser`, installs requirements in a cache-friendly layer, and copies only the files needed at runtime (`app.py`, `index.html`, `screenshot.png`). The container exposes port 8080 and starts Gunicorn with multiple workers and a bounded timeout, aligning with Cloud Run expectations while preserving a simple image build path that mirrors local behavior.
+The `Dockerfile` packages the app for production in a minimal Python 3.14 slim image, prioritizing predictable startup and safer runtime defaults. It sets Python environment flags for cleaner container behavior, creates and runs as a non-root `appuser`, installs requirements in a cache-friendly layer, and copies only the files needed at runtime (`app.py`, `index.html`, `screenshot.png`). The container exposes port 8080 and starts Gunicorn with 3 workers and a bounded timeout. The main application is extremely lightweight, requiring only 512MB of memory for the 3 concurrent Gunicorn workers. This aligns with Cloud Run expectations while preserving a simple image build path that mirrors local behavior.
 
 `cloudbuild.yaml` defines the CI/CD pipeline from validation through deployment. The first step (`Smoketests`) runs inside `python:3.14-slim` and does more than a superficial ping: it compiles all Python files, creates a virtual environment, installs dependencies, starts the Flask development server, installs `curl`, and verifies that the homepage response contains an expected sentinel string (`and/or fork:`), failing fast with response diagnostics if not. After this gate passes, the pipeline builds a no-cache Docker image, pushes it to Artifact Registry, and updates the Cloud Run service in `us-west1` using commit-based image tags and deployment labels for traceability. That smoketests stage is therefore the quality gate that protects the deploy stages from shipping obviously broken application behavior.
+
+`stream.py` is a standalone utility isolated from the main application to handle continuous live streaming. It launches an Xvfb virtual display to simulate a desktop environment and runs a headless Chromium browser via Playwright Sync API to load the live dashboard (`https://waikikiwx.live/`). It then leverages FFmpeg to capture the X11 screen buffer and stream it as an RTMPS feed to YouTube Live. It handles robust isolation for these subprocesses, monitors memory usage over its execution window to prevent OOM errors, and uploads the aggregate execution and subprocess logs to a Google Cloud Storage bucket (`gs://waikikiwx/live-stream-results.txt`) for later inspection. This separation of concerns ensures that heavy video-encoding tasks do not degrade the performance of the main web application.
 
