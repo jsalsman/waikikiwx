@@ -76,7 +76,7 @@ CMD ["python", "stream.py", "--duration", "1"]
    - Set the frequency to every 10 minutes (e.g., `*/10 * * * *`).
    - Set the target type to "Cloud Run Job" or configure an HTTP target pointing to the regional Cloud Run Jobs trigger endpoint.
 
-The `stream.py` script starts an Xvfb virtual display, opens a Playwright browser window pointing to `https://waikikiwx.live/`, and uses FFmpeg to stream the visual display directly to the YouTube RTMPS endpoint. It will also concatenate all logs and upload them to `gs://waikikiwx/live-stream-results.txt`.
+The `stream.py` script starts an Xvfb virtual display, opens a Playwright browser window pointing to `https://waikikiwx.live/`, and uses FFmpeg to stream the visual display directly to the YouTube RTMPS endpoint. It will also concatenate all logs and upload them to [`gs://waikikiwx/live-stream-results.txt`](https://storage.googleapis.com/waikikiwx/live-stream-results.txt).
 
 ## Historical Data Collection
 
@@ -92,7 +92,7 @@ To automate this collection using [Google Cloud Scheduler](https://cloud.google.
 2. Set the frequency to every 10 minutes (e.g., `*/10 * * * *`).
 3. Set the target type to HTTP and the URL to `https://waikikiwx.live/cron/collect-forecast?key=YOUR_SECRET_KEY` (replacing `YOUR_SECRET_KEY` with the exact string you used for the `COLLECT_FORECAST_KEY` environment variable).
 
-The endpoint saves a JSON file for each execution at `gs://waikikiwx/forecast-YYYY-MM-DD-HH-MM.json` (using Hawaii-Aleutian Standard Time).
+The endpoint saves a JSON file for each execution at `gs://waikikiwx/forecast-YYYY-MM-DD-HH-MM.json` (using Hawaii-Aleutian Standard Time). See https://storage.googleapis.com/waikikiwx/ for a listing in XML.
 
 ## Quick validation checklist
 
@@ -132,5 +132,5 @@ The `Dockerfile` packages the app for production in a minimal Python 3.14 slim i
 
 `cloudbuild.yaml` defines the CI/CD pipeline from validation through deployment. The first step (`Smoketests`) runs inside `python:3.14-slim` and does more than a superficial ping: it compiles all Python files, creates a virtual environment, installs dependencies, starts the Flask development server, installs `curl`, and verifies that the homepage response contains an expected sentinel string (`and/or fork:`), failing fast with response diagnostics if not. After this gate passes, the pipeline builds a no-cache Docker image, pushes it to Artifact Registry, and updates the Cloud Run service in `us-west1` using commit-based image tags and deployment labels for traceability. That smoketests stage is therefore the quality gate that protects the deploy stages from shipping obviously broken application behavior.
 
-`stream.py` is a standalone utility isolated from the main application to handle continuous live streaming. It launches an Xvfb virtual display to simulate a desktop environment and runs a headless Chromium browser via Playwright Sync API to load the live dashboard (`https://waikikiwx.live/`). It then leverages FFmpeg to capture the X11 screen buffer and stream it as an RTMPS feed to YouTube Live. It handles robust isolation for these subprocesses, monitors memory usage over its execution window to prevent OOM errors, and uploads the aggregate execution and subprocess logs to a Google Cloud Storage bucket (`gs://waikikiwx/live-stream-results.txt`) for later inspection. This separation of concerns ensures that heavy video-encoding tasks do not degrade the performance of the main web application.
+`stream.py` is a standalone utility isolated from the main application to handle continuous live streaming. It launches an Xvfb virtual display to simulate a desktop environment and runs a headless Chromium browser via Playwright Sync API to load the live dashboard (`https://waikikiwx.live/`). It then leverages FFmpeg to capture the X11 screen buffer and stream it as an RTMPS feed to YouTube Live. It handles robust isolation for these subprocesses, monitors memory usage over its execution window to prevent OOM errors, and uploads the aggregate execution and subprocess logs to a Google Cloud Storage bucket ([`gs://waikikiwx/live-stream-results.txt`](https://storage.googleapis.com/waikikiwx/live-stream-results.txt)) for later inspection. This separation of concerns ensures that heavy video-encoding tasks do not degrade the performance of the main web application.
 
