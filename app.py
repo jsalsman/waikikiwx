@@ -1,4 +1,4 @@
-import collections, datetime, json, math, os, re, requests, statistics, tempfile, uuid
+import collections, datetime, gc, json, math, os, psutil, re, requests, statistics, tempfile, uuid
 from google.cloud import storage
 from flask import Flask, jsonify, send_from_directory, render_template, request, Response
 
@@ -353,14 +353,11 @@ def scrape_forecast():
     # Fetch pre-calculated confidence intervals from GCS
     ci_bounds = {}
     try:
-        if not os.environ.get('GOOGLE_APPLICATION_CREDENTIALS') and not os.environ.get('KUBERNETES_SERVICE_HOST'):
-            pass
-        else:
-            client = storage.Client()
-            bucket = client.bucket('waikikiwx')
-            blob = bucket.blob('confidence-intervals.json')
-            if blob.exists():
-                ci_bounds = json.loads(blob.download_as_string())
+        client = storage.Client()
+        bucket = client.bucket('waikikiwx')
+        blob = bucket.blob('confidence-intervals.json')
+        if blob.exists():
+            ci_bounds = json.loads(blob.download_as_string())
     except Exception as e:
         app.logger.warning(f"Failed to fetch confidence intervals from GCS: {e}")
 
@@ -423,6 +420,9 @@ def parse_forecast_blob_time(blob_name):
 
 @app.route("/cron/collect-forecast")
 def cron_collect_forecast():
+    process = psutil.Process(os.getpid())
+    before_collection = process.memory_info().rss
+
     expected_key = os.environ.get("COLLECT_FORECAST_KEY")
     if not expected_key:
         app.logger.error("COLLECT_FORECAST_KEY environment variable is not set")
@@ -482,7 +482,29 @@ def cron_collect_forecast():
         )
         app.logger.info("Uploaded gs://waikikiwx/confidence-intervals.json")
 
-        return jsonify({"status": "success", "file": f"gs://waikikiwx/{blob_path}"}), 200
+        after_collection = process.memory_info().rss
+
+        # Free references
+        del historical_forecasts
+        del ci_data
+
+        gc_return = gc.collect()
+        after_gc = process.memory_info().rss
+
+        debug_memory = {
+            "before_collection": before_collection,
+            "after_collection": after_collection,
+            "gc_return": gc_return,
+            "after_gc": after_gc
+        }
+
+        bucket.blob("debug-memory.json").upload_from_string(
+            json.dumps(debug_memory),
+            content_type="application/json",
+        )
+        app.logger.info("Uploaded gs://waikikiwx/debug-memory.json")
+
+        return jsonify({"status": "success", "file": f"gs://waikikiwx/{blob_path}", "memory": debug_memory}), 200
 
     except Exception as e:
         msg = f"Failed to collect and upload forecast: {e}"
