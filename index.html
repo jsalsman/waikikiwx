@@ -1028,7 +1028,7 @@ function drawChart(id, W, H, data, defaultMn, defaultMx, opts = {}) {
     // Determine a safe step for X labels to avoid overlap
     const labelWidthEstimate = 20;
     const maxLabels = Math.floor(cW / labelWidthEstimate);
-    const xStep = Math.ceil(N / maxLabels);
+    const xStep = Math.max(2, Math.ceil(N / maxLabels));
 
     opts.xLabels.forEach((lbl, i) => {
       if (lbl && (i % xStep === 0 || i === N - 1)) {
