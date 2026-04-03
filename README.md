@@ -52,19 +52,20 @@ Then open:
 
 The dashboard supports live streaming directly to YouTube via RTMPS by using the standalone `stream.py` script.
 
-### Configuration
-1. Make sure you have Google Cloud Storage credentials configured (e.g. by running this on a GCE instance).
-2. Set the `YOUTUBE_STREAM_KEY` environment variable to your YouTube Live stream key.
-3. Install system dependencies for streaming (`ffmpeg`, `xvfb`) and python dependencies (`playwright`).
-4. Install playwright browsers: `playwright install chromium`
+### Executing as a Cloud Run Job
+To run the live stream automatically without managing infrastructure, you can package `stream.py` and its dependencies (like `ffmpeg`, `xvfb`, and `playwright`) into a container image and deploy it as a Cloud Run Job.
 
-### Automating with Cron
-To start a 1-minute live stream every 10 minutes, you can add an entry to your crontab:
-```bash
-*/10 * * * * export YOUTUBE_STREAM_KEY=YOUR_KEY; /path/to/venv/bin/python /path/to/stream.py --duration 1
-```
+1. Build a container image using a custom Dockerfile that installs system dependencies, Playwright browsers, and copies `stream.py`.
+2. Push the image to Google Artifact Registry.
+3. Create a Cloud Run Job using the pushed image:
+   - Configure the job to run with the `YOUTUBE_STREAM_KEY` environment variable set to your YouTube Live stream key.
+   - Ensure the service account running the job has write access to the `waikikiwx` Google Cloud Storage bucket so it can save logs.
+   - Set the command or entrypoint to execute `stream.py` with any desired arguments, e.g., `--duration 1`.
+4. Create a Google Cloud Scheduler job to trigger your Cloud Run Job periodically.
+   - Set the frequency to every 10 minutes (e.g., `*/10 * * * *`).
+   - Set the target type to "Cloud Run Job" or configure an HTTP target pointing to the regional Cloud Run Jobs trigger endpoint.
 
-The `stream.py` script starts an Xvfb virtual display, opens a Playwright browser window locally pointing to `https://waikikiwx.live/`, and uses FFmpeg to stream the visual display directly to the YouTube RTMPS endpoint. It will also concatenate all logs and upload them to `gs://waikikiwx/live-stream-results.txt`.
+The `stream.py` script starts an Xvfb virtual display, opens a Playwright browser window pointing to `https://waikikiwx.live/`, and uses FFmpeg to stream the visual display directly to the YouTube RTMPS endpoint. It will also concatenate all logs and upload them to `gs://waikikiwx/live-stream-results.txt`.
 
 ## Historical Data Collection
 
