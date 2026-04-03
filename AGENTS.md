@@ -7,6 +7,7 @@ These instructions apply to the entire repository.
 - The project is a weather dashboard using a Python Flask backend (`app.py`) and a single-file frontend (`index.html`) utilizing Jinja templates, vanilla JavaScript, and CSS flexbox.
 - The `Dockerfile` creates and uses a non-root `appuser`. The `WORKDIR /app` must be chowned to `appuser:appuser` to allow scripts to write files.
 - The main web application (`app.py`) runs via Gunicorn and requires only 512MB of memory for 3 workers.
+- The `/cron/collect-forecast` endpoint generates historical forecast data and calculates 50% confidence bounds based on historical proxy observations, saved as `gs://waikikiwx/confidence-intervals.json`.
 - When making HTTP requests to `api.weather.gov`, a descriptive `User-Agent` header (e.g., `waikikiwx (github.com/jsalsman/waikikiwx)`) must be included to prevent the request from being blocked.
 - Do not check for `GOOGLE_APPLICATION_CREDENTIALS` before initializing `storage.Client()` for Google Cloud Storage in `app.py` or `stream.py`. The deployed Cloud Run service account automatically provides necessary bucket permissions. Local sandbox environments lack these credentials, so expect GCS operations to raise exceptions locally unless mocked.
 

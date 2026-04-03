@@ -155,7 +155,7 @@ def neighbor_pool(errors_by_lead, lead_idx, var_name, min_samples, excluded_lead
             return pooled
     return []
 
-def calculate_ci_from_history(historical_forecasts, observed_by_target=None, coverage=0.90, min_samples=50):
+def calculate_ci_from_history(historical_forecasts, observed_by_target=None, coverage=0.50, min_samples=50):
     """
     Returns residual quantiles by lead:
         error_low/error_high = quantiles of (observed - forecast)
@@ -472,7 +472,7 @@ def cron_collect_forecast():
         ci_data = calculate_ci_from_history(
             historical_forecasts,
             observed_by_target=None,
-            coverage=0.90,
+            coverage=0.50,
             min_samples=50,
         )
 
