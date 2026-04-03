@@ -5,6 +5,10 @@ These instructions apply to the entire repository.
 
 ## Architecture
 - The project is a weather dashboard using a Python Flask backend (`app.py`) and a single-file frontend (`index.html`) utilizing Jinja templates, vanilla JavaScript, and CSS flexbox.
+- The `Dockerfile` creates and uses a non-root `appuser`. The `WORKDIR /app` must be chowned to `appuser:appuser` to allow scripts to write files.
+- The main web application (`app.py`) runs via Gunicorn and requires only 512MB of memory for 3 workers.
+- When making HTTP requests to `api.weather.gov`, a descriptive `User-Agent` header (e.g., `waikikiwx (github.com/jsalsman/waikikiwx)`) must be included to prevent the request from being blocked.
+- Do not check for `GOOGLE_APPLICATION_CREDENTIALS` before initializing `storage.Client()` for Google Cloud Storage in `app.py` or `stream.py`. The deployed Cloud Run service account automatically provides necessary bucket permissions. Local sandbox environments lack these credentials, so expect GCS operations to raise exceptions locally unless mocked.
 
 ## Testing workflow
 1. Install dependencies before runtime checks:
@@ -16,7 +20,7 @@ These instructions apply to the entire repository.
    - This suite covers all endpoints (`/`, `/forecast`, `/goes-airmass`, `/health-check`, `/icon`, `/screenshot.png`, `/robots.txt`) using `app.test_client()` and mocked external APIs.
 
 ## Streaming to YouTube
-- Live streaming to YouTube is managed by a standalone python script `stream.py`. This script requires system dependencies (`ffmpeg`, `xvfb`) and `playwright`.
+- Live streaming to YouTube is managed by a standalone python script `stream.py`. This script is meant to be packaged into a container and run as a periodic Cloud Run Job. It requires system dependencies (`ffmpeg`, `xvfb`), `playwright`, and at least 2GB of memory.
 4. Run comprehensive Playwright UI test suite:
    - Execute `python -m unittest tests/test_playwright.py`
    - This script runs a local server and uses Playwright to assert on key DOM elements (like `#loc-icon`, `#now-summary`, `.ftr-fork`, and the SVG IDs).
@@ -30,3 +34,4 @@ These instructions apply to the entire repository.
 ## Notes
 - Prefer concise patches and keep styling/JS in `index.html` unless a larger refactor is requested.
 - If tests cannot be run because dependencies are missing, install from `requirements.txt` first.
+- You do not need to run regression tests when you are only modifying `*.md` documentation files.
