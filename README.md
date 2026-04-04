@@ -67,14 +67,44 @@ COPY stream.py ./
 CMD ["python", "stream.py", "--duration", "1"]
 ```
 
-2. Push the image to Google Artifact Registry.
+2. Push the image to Google Artifact Registry:
+   ```bash
+   # Set your Google Cloud project ID and region
+   export PROJECT_ID="your-project-id"
+   export REGION="us-west1"
+   export ARTIFACT_REPO="waikikiwx-repo"
+
+   # Authenticate Docker to Artifact Registry
+   gcloud auth configure-docker ${REGION}-docker.pkg.dev
+
+   # Build and push the image using standard docker commands
+   docker build -f stream.Dockerfile -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPO}/waikikiwx-stream:latest .
+   docker push ${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPO}/waikikiwx-stream:latest
+   ```
+
 3. Create a Cloud Run Job using the pushed image:
-   - Allocate at least **2GB of memory** for the execution environment.
-   - Configure the job to run with the `YOUTUBE_STREAM_KEY` environment variable set to your YouTube Live stream key.
-   - Ensure the service account running the job has write access to the `waikikiwx` Google Cloud Storage bucket so it can save logs.
-4. Create a Google Cloud Scheduler job to trigger your Cloud Run Job periodically.
-   - Set the frequency to every 10 minutes (e.g., `*/10 * * * *`).
-   - Set the target type to "Cloud Run Job" or configure an HTTP target pointing to the regional Cloud Run Jobs trigger endpoint.
+   ```bash
+   export YOUTUBE_STREAM_KEY="your-stream-key"
+
+   gcloud run jobs create waikikiwx-stream-job \
+     --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${ARTIFACT_REPO}/waikikiwx-stream:latest \
+     --region ${REGION} \
+     --memory 2Gi \
+     --set-env-vars YOUTUBE_STREAM_KEY=${YOUTUBE_STREAM_KEY} \
+     --task-timeout 5m \
+     --max-retries 0
+   ```
+   *Note: Ensure the service account running the job has write access to the `waikikiwx` Google Cloud Storage bucket so it can save logs.*
+
+4. Create a Google Cloud Scheduler job to trigger your Cloud Run Job periodically (e.g., every 10 minutes):
+   ```bash
+   gcloud scheduler jobs create http waikikiwx-stream-trigger \
+     --location ${REGION} \
+     --schedule "*/10 * * * *" \
+     --uri "https://${REGION}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${PROJECT_ID}/jobs/waikikiwx-stream-job:run" \
+     --http-method POST \
+     --oauth-service-account-email "your-service-account@${PROJECT_ID}.iam.gserviceaccount.com"
+   ```
 
 The `stream.py` script starts an Xvfb virtual display, opens a Playwright browser window pointing to `https://waikikiwx.live/`, and uses FFmpeg to stream the visual display directly to the YouTube RTMPS endpoint. It will also concatenate all logs and upload them to [`gs://waikikiwx/live-stream-results.txt`](https://storage.googleapis.com/waikikiwx/live-stream-results.txt).
 
