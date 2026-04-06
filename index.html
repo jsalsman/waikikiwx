@@ -893,7 +893,11 @@ function drawChart(id, W, H, data, defaultMn, defaultMx, opts = {}) {
   const rect = svg.parentElement.getBoundingClientRect();
   W = rect.width;
   // Subtracting header height roughly
-  H = rect.height - 24;
+  if (opts.fixedHeight) {
+    H = opts.fixedHeight;
+  } else {
+    H = rect.height - 24;
+  }
   if (W === 0 || H <= 0) {
     W = svg.clientWidth || 300;
     H = svg.clientHeight || 100;
@@ -1206,6 +1210,7 @@ function renderAll(data) {
     drawChart('cGolf', cW, golfH, dummyData, 0, 10,
       {
         textOnly: data.golf,
+        fixedHeight: golfH,
         xLabels, weekdayLabels, dayChangeIndices
       });
 
