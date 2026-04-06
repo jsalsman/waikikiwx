@@ -473,6 +473,10 @@ thead tr th { border-top: none; }
         <div class="sec-lbl">Wind Speed <span style="font-size: 0.8em; opacity: 0.7; margin-left: 0.5em; font-style: italic;">(MPH; <span style="text-transform: lowercase;">dashed: gusts</span>)</span></div>
         <svg id="cWind" style="width:100%; height:100%;"></svg>
       </div>
+      <div class="chart-panel">
+        <div class="sec-lbl">Golf Weather <span style="font-size: 0.8em; opacity: 0.7; margin-left: 0.5em; font-style: italic;">(even hours)</span></div>
+        <svg id="cGolf" style="width:100%; height:100%;"></svg>
+      </div>
     </div>
   </div>
 
@@ -1033,7 +1037,14 @@ function drawChart(id, W, H, data, defaultMn, defaultMx, opts = {}) {
   }
 
   // Draw Data
-  if (opts.bars) {
+  if (opts.textOnly) {
+    const yBaseline = PT + cH / 2 + 6; // Centered roughly
+    opts.textOnly.forEach((txt, i) => {
+      if (txt) {
+        svgTxt(svg, txt, xp(i), yBaseline, "calc(var(--fs) * 1.5)", '#ffffff');
+      }
+    });
+  } else if (opts.bars) {
     const bW = (cW / N) * 0.7;
     data.forEach((v, i) => {
       const x = xp(i) - bW / 2;
@@ -1183,6 +1194,23 @@ function renderAll(data) {
       ciLower: data.speed_ci_lower, ciUpper: data.speed_ci_upper, ciColor: 'rgba(57,217,138,0.15)',
       overlayData: offsetGust, overlayColor: '#88ffbb', warnAt: 35, xLabels, weekdayLabels, dayChangeIndices
     });
+
+  if (data.golf) {
+    // For textOnly charts, we pass a dummy data array of zeros
+    const dummyData = new Array(data.hour.length).fill(0);
+    drawChart('cGolf', cW, cH, dummyData, 0, 10,
+      {
+        textOnly: data.golf,
+        xLabels, weekdayLabels, dayChangeIndices
+      });
+
+    // Hide the grid lines and Y-axis labels for the golf chart
+    const golfSvg = document.getElementById('cGolf');
+    const lines = golfSvg.querySelectorAll('line:not([stroke-dasharray])');
+    lines.forEach(l => l.remove());
+    const texts = golfSvg.querySelectorAll('text[text-anchor="end"]');
+    texts.forEach(t => t.remove());
+  }
 }
 
 let currentData = null;

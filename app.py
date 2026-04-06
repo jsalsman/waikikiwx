@@ -337,8 +337,30 @@ def scrape_forecast():
     def hour_from_iso(iso):
         return int(iso.split('T')[1][:2])
 
+    hours_int = [hour_from_iso(p['startTime']) for p in periods]
+
+    golf = []
+    for i, p in enumerate(periods):
+        is_daytime = p.get('isDaytime', False)
+
+        # Determine transitions
+        prev_daytime = periods[i-1].get('isDaytime', False) if i > 0 else is_daytime
+
+        if is_daytime and not prev_daytime:
+            golf.append('🌅')
+        elif prev_daytime and not is_daytime:
+            # We place the sunset emoji on the first night hour
+            golf.append('🌇')
+        elif is_daytime and hours_int[i] % 2 == 0:
+            if precip[i] <= 25 and speed[i] <= 30:
+                golf.append('👍')
+            else:
+                golf.append('👎')
+        else:
+            golf.append('')
+
     forecast_data = {
-        'hour': [hour_from_iso(p['startTime']) for p in periods],
+        'hour': hours_int,
         'temp': temp,
         'apparent_temp': apparent_temp,
         'precip': precip,
@@ -347,7 +369,8 @@ def scrape_forecast():
         'gust': wind_gust,
         'direction': [p['windDirection'] for p in periods],
         'icon': [p.get('icon', '') for p in periods],
-        'short': [p.get('shortForecast', '') for p in periods]
+        'short': [p.get('shortForecast', '') for p in periods],
+        'golf': golf
     }
 
     # Fetch pre-calculated confidence intervals from GCS
