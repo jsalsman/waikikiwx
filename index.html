@@ -155,6 +155,7 @@ html, body {
   gap: 0.35em;
 }
 .chart-panel:last-child { border-bottom: none; }
+.golf-panel { flex: 0 0 auto !important; min-height: 0 !important; }
 .sec-lbl {
   flex-shrink: 0;
   font-size: var(--fs);
@@ -473,9 +474,9 @@ thead tr th { border-top: none; }
         <div class="sec-lbl">Wind Speed <span style="font-size: 0.8em; opacity: 0.7; margin-left: 0.5em; font-style: italic;">(MPH; <span style="text-transform: lowercase;">dashed: gusts</span>)</span></div>
         <svg id="cWind" style="width:100%; height:100%;"></svg>
       </div>
-      <div class="chart-panel">
+      <div class="chart-panel golf-panel">
         <div class="sec-lbl">Golf Weather <span style="font-size: 0.8em; opacity: 0.7; margin-left: 0.5em; font-style: italic;">(even hours)</span></div>
-        <svg id="cGolf" style="width:100%; height:100%;"></svg>
+        <svg id="cGolf" style="width:100%; height:1.5em;"></svg>
       </div>
     </div>
   </div>
@@ -1198,7 +1199,11 @@ function renderAll(data) {
   if (data.golf) {
     // For textOnly charts, we pass a dummy data array of zeros
     const dummyData = new Array(data.hour.length).fill(0);
-    drawChart('cGolf', cW, cH, dummyData, 0, 10,
+
+    // We only need the chart to be tall enough for one row of emojis (e.g. 24px)
+    // Avoid reading clientHeight if it is skewed by flex layout
+    const golfH = 24;
+    drawChart('cGolf', cW, golfH, dummyData, 0, 10,
       {
         textOnly: data.golf,
         xLabels, weekdayLabels, dayChangeIndices
