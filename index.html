@@ -1059,19 +1059,17 @@ function drawChart(id, W, H, data, defaultMn, defaultMx, opts = {}) {
       const fill = v >= 50 ? '#ff4444' : v >= 30 ? '#ffcc00' : '#00c8ff';
       svg.appendChild(svgEl('rect', { x, y, width: bW, height: bh, fill, rx: 1, opacity: 0.85 }));
 
-      // Optionally overlay text data on bars mapped to the right axis scale
-      if (opts.textData && opts.rightAxisMax !== undefined && opts.textData[i] > 0) {
-        // Find Y position for the right axis
-        const rightY = PT + cH - (opts.textData[i] / (opts.rightAxisMax || 1)) * cH;
-        // Optionally draw a small dot/indicator or just the text
-        // If we just want text positioned roughly at the bar top or at the scaled rightY:
-        // We'll place it slightly above the bar y or rightY, whichever makes more sense
-        // To be visually aligned with the right axis, we should position it at rightY
-        svgTxt(svg, opts.textData[i].toFixed(2), x + bW / 2, rightY - 4, "calc(var(--fs) * 0.9)", '#ffffff', 'middle');
-        // Let's add a small dashed line or dot so they know where the value is
-        svg.appendChild(svgEl('circle', { cx: x + bW / 2, cy: rightY, r: 2, fill: '#ffffff', opacity: 0.8 }));
-      }
     });
+
+    if (opts.textData && opts.rightAxisMax !== undefined) {
+      const overlayLineD = opts.textData.map((v, i) => {
+        const rightY = PT + cH - (v / (opts.rightAxisMax || 1)) * cH;
+        return `${i === 0 ? 'M' : 'L'}${xp(i).toFixed(1)},${rightY.toFixed(1)}`;
+      }).join(' ');
+
+      svg.appendChild(svgEl('path', { d: overlayLineD, fill: 'none', stroke: '#ffffff',
+        'stroke-width': 1.5, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'stroke-dasharray': '4,4', opacity: 0.8 }));
+    }
   } else {
     const lineD = data.map((v, i) =>
       `${i === 0 ? 'M' : 'L'}${xp(i).toFixed(1)},${yp(v).toFixed(1)}`).join(' ');
