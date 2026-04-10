@@ -719,19 +719,19 @@ function attachGoesOverlay(parent) {
   loadGoesImages();
 
   function cycleOverlay() {
-    parent.classList.add('show-hi');
+    parent.classList.add('show-phmo');
     goesOverlayTimer = setTimeout(() => {
-      parent.classList.remove('show-hi');
-      parent.classList.add('show-tpw');
+      parent.classList.remove('show-phmo');
+      parent.classList.add('show-hi');
       goesOverlayTimer = setTimeout(() => {
-        parent.classList.remove('show-tpw');
-        parent.classList.add('show-phmo');
+        parent.classList.remove('show-hi');
+        parent.classList.add('show-tpw');
         goesOverlayTimer = setTimeout(() => {
-          parent.classList.remove('show-phmo');
+          parent.classList.remove('show-tpw');
           goesOverlayTimer = setTimeout(cycleOverlay, 4000); // 4s off
-        }, 6000); // 6s on (phmo gif)
-      }, 6000); // 6s on (tpw gif)
-    }, 6000); // 6s on (hi gif)
+        }, 6000); // 6s on (tpw gif)
+      }, 6000); // 6s on (hi gif)
+    }, 6000); // 6s on (phmo gif)
   }
 
   cycleOverlay();
