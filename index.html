@@ -219,14 +219,6 @@ html, body {
 .goes-time {
   color: var(--muted);
 }
-.goes-overlay img {
-  width: 100%;
-  min-height: 0;
-  flex: 1;
-  object-fit: contain;
-  border: 1px solid var(--border);
-  position: relative;
-}
 
 /* Markers Overlay Container */
 .goes-img-wrap {
@@ -249,6 +241,7 @@ html, body {
   max-height: 100%;
   display: block;
   object-fit: contain;
+  border: 1px solid var(--border);
 }
 
 /* Color Key */
@@ -264,8 +257,8 @@ html, body {
   letter-spacing: 0.05em;
 }
 
-.hi-overlay .goes-img-wrap img {
-  width: 68%; /* Rest of the width */
+.hi-overlay .goes-img-wrap > a {
+  max-width: 68%; /* Rest of the width */
 }
 
 .color-key-block {
