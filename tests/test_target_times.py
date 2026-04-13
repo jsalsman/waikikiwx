@@ -1,22 +1,42 @@
 import sys
 import unittest
 import datetime
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
-# Mock dependencies to allow importing app.py in an environment where they are missing.
-# This is necessary because app.py performs many top-level imports and initializations.
-mock_modules = [
-    'psutil',
-    'google',
-    'google.cloud',
-    'google.cloud.storage',
-    'flask',
-    'requests'
-]
-for module in mock_modules:
-    sys.modules[module] = MagicMock()
+def safe_import_app():
+    """
+    Safely imports the 'app' module, mocking only missing dependencies
+    during the import to avoid polluting sys.modules permanently.
+    """
+    if 'app' in sys.modules:
+        return sys.modules['app']
 
-import app
+    dependencies = [
+        'psutil',
+        'google',
+        'google.cloud',
+        'google.cloud.storage',
+        'flask',
+        'requests'
+    ]
+
+    missing_mocks = {}
+    for dep in dependencies:
+        try:
+            __import__(dep)
+        except ImportError:
+            missing_mocks[dep] = MagicMock()
+
+    if missing_mocks:
+        with patch.dict(sys.modules, missing_mocks):
+            import app
+            return app
+    else:
+        import app
+        return app
+
+# Perform the safe import
+app = safe_import_app()
 
 class TestTargetTimes(unittest.TestCase):
     """
@@ -27,8 +47,6 @@ class TestTargetTimes(unittest.TestCase):
 
     def test_basic_progression(self):
         """Test a simple sequence of hours within the same day."""
-        # start=2026-03-28 19:00, hours=["19", "20", "21"]
-        # expected -> [2026-03-28 19:00, 2026-03-28 20:00, 2026-03-28 21:00]
         start = datetime.datetime(2026, 3, 28, 19, 0)
         hours = ["19", "20", "21"]
         expected = [
@@ -41,8 +59,6 @@ class TestTargetTimes(unittest.TestCase):
 
     def test_forward_midnight(self):
         """Test transitioning from 23:00 to 00:00 (next day)."""
-        # start=2026-03-28 22:00, hours=["22", "23", "0", "1"]
-        # expected -> [2026-03-28 22:00, 2026-03-28 23:00, 2026-03-29 00:00, 2026-03-29 01:00]
         start = datetime.datetime(2026, 3, 28, 22, 0)
         hours = ["22", "23", "0", "1"]
         expected = [
@@ -60,8 +76,6 @@ class TestTargetTimes(unittest.TestCase):
         Example: Fetching at 00:30, but receiving a forecast starting at 23:00.
         Expected: The 23:00 entry should be for the previous day, not the current day.
         """
-        # start=2026-03-29 00:30, hours=["23", "0", "1"]
-        # expected -> [2026-03-28 23:00, 2026-03-29 00:00, 2026-03-29 01:00]
         start = datetime.datetime(2026, 3, 29, 0, 30)
         hours = ["23", "0", "1"]
         expected = [
