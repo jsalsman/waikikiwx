@@ -76,6 +76,8 @@ def get_target_times(start_dt, hours):
         h = int(h_str)
         if h < prev_h and (prev_h - h) > 12:
             current += datetime.timedelta(days=1)
+        elif h > prev_h and (h - prev_h) > 12:
+            current -= datetime.timedelta(days=1)
         current = current.replace(hour=h)
         times.append(current)
         prev_h = h
@@ -387,15 +389,17 @@ def scrape_forecast():
         c_precip = forecast_data['precip'][i] if i < len(forecast_data['precip']) else 0
         c_speed = forecast_data['speed'][i] if i < len(forecast_data['speed']) else 0
 
-        # Lower bound = current forecast + lower bound error (which is negative)
-        temp_lower.append(round(c_temp + bounds['temp_error_low']))
-        temp_upper.append(round(c_temp + bounds['temp_error_high']))
+        # Error = forecast - truth. Therefore, Truth = forecast - error.
+        # Lower bound of Truth = forecast - high_error
+        # Upper bound of Truth = forecast - low_error
+        temp_lower.append(round(c_temp - bounds['temp_error_high']))
+        temp_upper.append(round(c_temp - bounds['temp_error_low']))
 
-        precip_lower.append(max(0, min(100, round(c_precip + bounds['precip_error_low']))))
-        precip_upper.append(max(0, min(100, round(c_precip + bounds['precip_error_high']))))
+        precip_lower.append(max(0, min(100, round(c_precip - bounds['precip_error_high']))))
+        precip_upper.append(max(0, min(100, round(c_precip - bounds['precip_error_low']))))
 
-        speed_lower.append(max(0, round(c_speed + bounds['speed_error_low'])))
-        speed_upper.append(max(0, round(c_speed + bounds['speed_error_high'])))
+        speed_lower.append(max(0, round(c_speed - bounds['speed_error_high'])))
+        speed_upper.append(max(0, round(c_speed - bounds['speed_error_low'])))
 
     forecast_data['temp_ci_lower'] = temp_lower
     forecast_data['temp_ci_upper'] = temp_upper
