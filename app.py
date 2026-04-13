@@ -65,19 +65,6 @@ def parse_iso8601_duration(d):
     total_hours = (days * 24) + hours
     return total_hours if total_hours > 0 else 1
 
-def percentile(N, percent, key=lambda x:x):
-    if not N:
-        return None
-    N.sort(key=key)
-    k = (len(N)-1) * percent
-    f = math.floor(k)
-    c = math.ceil(k)
-    if f == c:
-        return key(N[int(k)])
-    d0 = key(N[int(f)]) * (c-k)
-    d1 = key(N[int(c)]) * (k-f)
-    return d0+d1
-
 def get_target_times(start_dt, hours):
     times = []
     current = start_dt.replace(minute=0, second=0, microsecond=0)
