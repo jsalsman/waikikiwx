@@ -109,6 +109,19 @@ class AppTestCase(unittest.TestCase):
         response = self.client.get('/icon?url=https://example.com/icon.png')
         self.assertEqual(response.status_code, 403)
 
+    def test_icon_ssrf_bypass(self):
+        # Test bypass attempts
+        bypasses = [
+            'https://api.weather.gov.attacker.com/evil',
+            'https://api.weather.gov@attacker.com/evil',
+            'http://api.weather.gov/icons/test.png',
+            'https://attacker.com@api.weather.gov/evil',
+        ]
+        for url in bypasses:
+            with self.subTest(url=url):
+                response = self.client.get(f'/icon?url={url}')
+                self.assertEqual(response.status_code, 403)
+
     @patch('app.get_forecast_urls')
     @patch('app.requests.get')
     def test_scrape_forecast_custom_wind_chill(self, mock_get, mock_get_forecast_urls):
