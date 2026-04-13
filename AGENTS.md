@@ -17,8 +17,8 @@ These instructions apply to the entire repository.
 2. Run basic syntax check:
    - `python -m py_compile app.py`
 3. Run comprehensive API test suite:
-   - Execute `python -m unittest tests/test_app.py`
-   - This suite covers all endpoints (`/`, `/forecast`, `/goes-airmass`, `/health-check`, `/icon`, `/screenshot.png`, `/robots.txt`) using `app.test_client()` and mocked external APIs.
+   - Execute `python -m unittest discover tests`
+   - This suite covers all endpoints (`tests/test_app.py`) and pure utility functions (`tests/test_utils.py`) using `app.test_client()` and mocked external APIs.
 
 ## Streaming to YouTube
 - Live streaming to YouTube is managed by a standalone python script `stream.py`. This script is meant to be packaged into a container and run as a periodic Cloud Run Job. It requires system dependencies (`ffmpeg`, `xvfb`), `playwright`, and at least 2GB of memory.
