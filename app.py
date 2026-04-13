@@ -76,6 +76,8 @@ def get_target_times(start_dt, hours):
         h = int(h_str)
         if h < prev_h and (prev_h - h) > 12:
             current += datetime.timedelta(days=1)
+        elif h > prev_h and (h - prev_h) > 12:
+            current -= datetime.timedelta(days=1)
         current = current.replace(hour=h)
         times.append(current)
         prev_h = h
