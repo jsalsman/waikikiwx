@@ -1,4 +1,5 @@
 import collections, datetime, gc, json, math, os, psutil, re, requests, statistics, tempfile, uuid
+from urllib.parse import urlparse
 from google.cloud import storage
 from flask import Flask, jsonify, send_from_directory, render_template, request, Response
 
@@ -595,8 +596,14 @@ def fetch_icon():
     url = request.args.get('url')
     if not url:
         return "No url parameter provided", 400
-    if not url.startswith('https://api.weather.gov/'):
-        return "Invalid URL domain", 403
+
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme != 'https' or parsed.netloc != 'api.weather.gov':
+            return "Invalid URL domain", 403
+    except Exception:
+        return "Invalid URL format", 400
+
     try:
         # NWS blocks standard User-Agents, spoofing it here
         req_headers = {'User-Agent': HEADERS['User-Agent']}

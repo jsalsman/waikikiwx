@@ -9,6 +9,7 @@ These instructions apply to the entire repository.
 - The main web application (`app.py`) runs via Gunicorn and requires only 512MB of memory for 3 workers.
 - The `/cron/collect-forecast` endpoint generates historical forecast data and calculates 50% confidence bounds based on historical proxy observations, saved as `gs://waikikiwx/confidence-intervals.json`.
 - When making HTTP requests to `api.weather.gov`, a descriptive `User-Agent` header (e.g., `waikikiwx (github.com/jsalsman/waikikiwx)`) must be included to prevent the request from being blocked.
+- The `/icon` endpoint uses `urllib.parse.urlparse` for strict validation (https scheme and `api.weather.gov` netloc) to prevent SSRF vulnerabilities.
 - Do not check for `GOOGLE_APPLICATION_CREDENTIALS` before initializing `storage.Client()` for Google Cloud Storage in `app.py` or `stream.py`. The deployed Cloud Run service account automatically provides necessary bucket permissions. Local sandbox environments lack these credentials, so expect GCS operations to raise exceptions locally unless mocked.
 
 ## Testing workflow
