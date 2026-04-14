@@ -66,19 +66,23 @@ def parse_iso8601_duration(d):
     return total_hours if total_hours > 0 else 1
 
 def get_target_times(start_dt, hours):
-    times = []
-    current = start_dt.replace(minute=0, second=0, microsecond=0)
     if not hours:
-        return times
+        return []
 
+    current = start_dt.replace(minute=0, second=0, microsecond=0)
+    times = []
     prev_h = current.hour
+    hour_td = datetime.timedelta(hours=1)
+    day_td = datetime.timedelta(days=1)
+
     for h_str in hours:
         h = int(h_str)
-        if h < prev_h and (prev_h - h) > 12:
-            current += datetime.timedelta(days=1)
-        elif h > prev_h and (h - prev_h) > 12:
-            current -= datetime.timedelta(days=1)
-        current = current.replace(hour=h)
+        if h == (prev_h + 1) % 24:
+            current += hour_td
+        else:
+            if h < prev_h and (prev_h - h) > 12:
+                current += day_td
+            current = current.replace(hour=h)
         times.append(current)
         prev_h = h
     return times
