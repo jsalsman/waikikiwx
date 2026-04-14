@@ -76,7 +76,6 @@ def main():
         log_msg("Starting Playwright (isolated process)...")
         pw_script_content = f"""
 from playwright.sync_api import sync_playwright
-import time
 
 def on_console(msg):
     print(f"BROWSER CONSOLE [{{msg.type}}]: {{msg.text}}", flush=True)
@@ -101,7 +100,7 @@ try:
         print(f"Page title: {{page.title()}}", flush=True)
 
         print("Holding browser open for stream...", flush=True)
-        time.sleep({duration_seconds + 300})
+        page.wait_for_timeout({(duration_seconds + 300) * 1000})
 except Exception as e:
     print("Playwright error:", e, flush=True)
 """

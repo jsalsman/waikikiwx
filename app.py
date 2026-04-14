@@ -1,4 +1,5 @@
 import collections, datetime, gc, json, math, os, psutil, re, requests, statistics, tempfile, uuid
+from urllib.parse import urlparse
 from google.cloud import storage
 from flask import Flask, jsonify, send_from_directory, render_template, request, Response
 
@@ -63,19 +64,6 @@ def parse_iso8601_duration(d):
 
     total_hours = (days * 24) + hours
     return total_hours if total_hours > 0 else 1
-
-def percentile(N, percent, key=lambda x:x):
-    if not N:
-        return None
-    N.sort(key=key)
-    k = (len(N)-1) * percent
-    f = math.floor(k)
-    c = math.ceil(k)
-    if f == c:
-        return key(N[int(k)])
-    d0 = key(N[int(f)]) * (c-k)
-    d1 = key(N[int(c)]) * (k-f)
-    return d0+d1
 
 def get_target_times(start_dt, hours):
     if not hours:
@@ -601,8 +589,14 @@ def fetch_icon():
     url = request.args.get('url')
     if not url:
         return "No url parameter provided", 400
-    if not url.startswith('https://api.weather.gov/'):
-        return "Invalid URL domain", 403
+
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme != 'https' or parsed.netloc != 'api.weather.gov':
+            return "Invalid URL domain", 403
+    except Exception:
+        return "Invalid URL format", 400
+
     try:
         # NWS blocks standard User-Agents, spoofing it here
         req_headers = {'User-Agent': HEADERS['User-Agent']}

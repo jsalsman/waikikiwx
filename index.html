@@ -219,14 +219,6 @@ html, body {
 .goes-time {
   color: var(--muted);
 }
-.goes-overlay img {
-  width: 100%;
-  min-height: 0;
-  flex: 1;
-  object-fit: contain;
-  border: 1px solid var(--border);
-  position: relative;
-}
 
 /* Markers Overlay Container */
 .goes-img-wrap {
@@ -236,11 +228,20 @@ html, body {
   min-height: 0;
   width: 100%;
   justify-content: center;
+  align-items: center;
+}
+.goes-img-wrap > a {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+  max-height: 100%;
 }
 .goes-img-wrap img {
-  width: 100%;
-  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
   object-fit: contain;
+  border: 1px solid var(--border);
 }
 
 /* Color Key */
@@ -256,8 +257,8 @@ html, body {
   letter-spacing: 0.05em;
 }
 
-.hi-overlay .goes-img-wrap img {
-  width: 68%; /* Rest of the width */
+.hi-overlay .goes-img-wrap > a {
+  max-width: 68%; /* Rest of the width */
 }
 
 .color-key-block {
@@ -270,21 +271,6 @@ html, body {
   line-height: 1.1;
   word-break: break-word;
 }
-.goes-marker-layer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-.show-tpw .goes-marker-layer.tpw-marker-layer,
-.show-hi .goes-marker-layer.hi-marker-layer,
-.show-phmo .goes-marker-layer.phmo-marker-layer {
-  opacity: 1;
-}
 .goes-dot {
   position: absolute;
   width: 6px;
@@ -292,6 +278,7 @@ html, body {
   background: #00c8ff;
   transform: translate(-50%, -50%) rotate(45deg);
   box-shadow: 0 0 6px #00c8ff;
+  pointer-events: none;
 }
 .blk-lbl {
   flex-shrink: 0;
@@ -482,7 +469,7 @@ thead tr th { border-top: none; }
   </div>
 
   <div class="ftr">
-    <div class="ftr-src">NOAA / NWS HONOLULU · <a href="https://forecast.weather.gov" style="color: inherit; text-decoration: underline;">forecast.weather.gov</a></div>
+    <div class="ftr-src">NOAA / NWS HONOLULU · <a href="https://www.weather.gov/hfo/AFD" style="color: inherit; text-decoration: underline;">forecast.weather.gov</a></div>
     <div class="ftr-next">
       <div class="pulse"></div>
       NEXT UPDATE <span id="cd">10:00</span>
@@ -662,8 +649,9 @@ function attachGoesOverlay(parent) {
     <div class="goes-wrap">
       <div class="goes-title" id="goes-title-hi">GOES West Hawaii Air Mass <span class="goes-time" id="goes-time-hi">loading…</span></div>
       <div class="goes-img-wrap">
-        <a id="goes-link-hi" target="_blank" style="display: flex; width: 100%; height: 100%; text-decoration: none;">
+        <a id="goes-link-hi" target="_blank">
           <img id="goes-img-hi" alt="Latest GOES West Hawaii Air Mass animation">
+          <div class="goes-dot" style="left: 27.8%; top: 48.5%;"></div>
         </a>
         <div class="color-key-container">
           <div class="color-key-block" style="background: #b52007; color: #ffffff;">JET STREAM / DRY UPPER LEVEL</div>
@@ -675,9 +663,6 @@ function attachGoesOverlay(parent) {
           <div class="color-key-block" style="background: #365B2D; color: #ffffff;">LOW LEVEL CLOUD</div>
           <div class="color-key-block" style="background: #6e008c; color: #ffffff;">LIMB EFFECTS</div>
         </div>
-        <div class="goes-marker-layer hi-marker-layer" id="goes-marker-layer-hi">
-          <div class="goes-dot"></div>
-        </div>
       </div>
     </div>`;
   parent.appendChild(overlayHi);
@@ -688,12 +673,10 @@ function attachGoesOverlay(parent) {
     <div class="goes-wrap">
       <div class="goes-title" id="goes-title-tpw">GOES West Tropical Pacific West Air Mass <span class="goes-time" id="goes-time-tpw">loading…</span></div>
       <div class="goes-img-wrap">
-        <a id="goes-link-tpw" target="_blank" style="display: flex; width: 100%; height: 100%; text-decoration: none;">
+        <a id="goes-link-tpw" target="_blank">
           <img id="goes-img-tpw" alt="Latest GOES West Tropical Pacific West Air Mass animation">
+          <div class="goes-dot" style="left: 25.8%; top: 35.6%;"></div>
         </a>
-        <div class="goes-marker-layer tpw-marker-layer" id="goes-marker-layer-tpw">
-          <div class="goes-dot"></div>
-        </div>
       </div>
     </div>`;
   parent.appendChild(overlayTpw);
@@ -704,12 +687,10 @@ function attachGoesOverlay(parent) {
     <div class="goes-wrap">
       <div class="goes-title" id="goes-title-phmo">NWS Hawaii Radar loop <span class="goes-time" id="goes-time-phmo">loading…</span></div>
       <div class="goes-img-wrap">
-        <a id="goes-link-phmo" target="_blank" style="display: flex; width: 100%; height: 100%; text-decoration: none;">
+        <a id="goes-link-phmo" target="_blank">
           <img id="goes-img-phmo" alt="Latest NWS Hawaii Radar loop animation">
+          <div class="goes-dot" style="left: 35%; top: 48%;"></div>
         </a>
-        <div class="goes-marker-layer phmo-marker-layer" id="goes-marker-layer-phmo">
-          <div class="goes-dot"></div>
-        </div>
       </div>
     </div>`;
   parent.appendChild(overlayPhmo);
@@ -719,19 +700,19 @@ function attachGoesOverlay(parent) {
   loadGoesImages();
 
   function cycleOverlay() {
-    parent.classList.add('show-hi');
+    parent.classList.add('show-phmo');
     goesOverlayTimer = setTimeout(() => {
-      parent.classList.remove('show-hi');
-      parent.classList.add('show-tpw');
+      parent.classList.remove('show-phmo');
+      parent.classList.add('show-hi');
       goesOverlayTimer = setTimeout(() => {
-        parent.classList.remove('show-tpw');
-        parent.classList.add('show-phmo');
+        parent.classList.remove('show-hi');
+        parent.classList.add('show-tpw');
         goesOverlayTimer = setTimeout(() => {
-          parent.classList.remove('show-phmo');
+          parent.classList.remove('show-tpw');
           goesOverlayTimer = setTimeout(cycleOverlay, 4000); // 4s off
-        }, 6000); // 6s on (phmo gif)
-      }, 6000); // 6s on (tpw gif)
-    }, 6000); // 6s on (hi gif)
+        }, 6000); // 6s on (tpw gif)
+      }, 6000); // 6s on (hi gif)
+    }, 6000); // 6s on (phmo gif)
   }
 
   cycleOverlay();
@@ -773,31 +754,11 @@ async function loadGoesImages() {
     const goesLinkPhmo = document.getElementById('goes-link-phmo');
     if (goesLinkPhmo) goesLinkPhmo.href = goesImgPhmo.src;
 
-    // Setup markers for phmo
-    if (goesImgPhmo._updateMarkersRef) {
-      window.removeEventListener('resize', goesImgPhmo._updateMarkersRef);
-      goesImgPhmo.removeEventListener('load', goesImgPhmo._updateMarkersRef);
-    }
-    goesImgPhmo._updateMarkersRef = () => updateMarkers('phmo');
-    goesImgPhmo.addEventListener('load', goesImgPhmo._updateMarkersRef);
-    window.addEventListener('resize', goesImgPhmo._updateMarkersRef);
-    if (goesImgPhmo.complete && goesImgPhmo.naturalWidth > 0) updateMarkers('phmo');
-
     if (urls.hi) {
       goesImgHi.src = `${urls.hi}${urls.hi.includes('?') ? '&' : '?'}t=${ts}`;
       goesTimeHi.textContent = timeStr;
       const goesLinkHi = document.getElementById('goes-link-hi');
       if (goesLinkHi) goesLinkHi.href = goesImgHi.src;
-
-      // Setup markers for hi
-      if (goesImgHi._updateMarkersRef) {
-        window.removeEventListener('resize', goesImgHi._updateMarkersRef);
-        goesImgHi.removeEventListener('load', goesImgHi._updateMarkersRef);
-      }
-      goesImgHi._updateMarkersRef = () => updateMarkers('hi');
-      goesImgHi.addEventListener('load', goesImgHi._updateMarkersRef);
-      window.addEventListener('resize', goesImgHi._updateMarkersRef);
-      if (goesImgHi.complete && goesImgHi.naturalWidth > 0) updateMarkers('hi');
     }
 
     if (urls.tpw) {
@@ -805,68 +766,12 @@ async function loadGoesImages() {
       goesTimeTpw.textContent = timeStr;
       const goesLinkTpw = document.getElementById('goes-link-tpw');
       if (goesLinkTpw) goesLinkTpw.href = goesImgTpw.src;
-
-      // Setup markers for tpw
-      if (goesImgTpw._updateMarkersRef) {
-        window.removeEventListener('resize', goesImgTpw._updateMarkersRef);
-        goesImgTpw.removeEventListener('load', goesImgTpw._updateMarkersRef);
-      }
-      goesImgTpw._updateMarkersRef = () => updateMarkers('tpw');
-      goesImgTpw.addEventListener('load', goesImgTpw._updateMarkersRef);
-      window.addEventListener('resize', goesImgTpw._updateMarkersRef);
-      if (goesImgTpw.complete && goesImgTpw.naturalWidth > 0) updateMarkers('tpw');
     }
 
   } catch (err) {
     console.error('[goes] fetch failed:', err);
     if (goesTimeHi) goesTimeHi.textContent = '· unavailable';
     if (goesTimeTpw) goesTimeTpw.textContent = '· unavailable';
-  }
-}
-
-function updateMarkers(sector) {
-  const goesImg = document.getElementById(`goes-img-${sector}`);
-  if (!goesImg) return;
-
-  const imgRect = goesImg.getBoundingClientRect();
-  const wrapperRect = goesImg.parentElement.getBoundingClientRect();
-  if (imgRect.width === 0 || imgRect.height === 0) return;
-
-  const imgRatio = goesImg.naturalWidth / goesImg.naturalHeight;
-  const containerRatio = imgRect.width / imgRect.height;
-
-  let renderWidth = imgRect.width;
-  let renderHeight = imgRect.height;
-  let offsetX = imgRect.left - wrapperRect.left;
-  let offsetY = imgRect.top - wrapperRect.top;
-
-  if (imgRatio > containerRatio) {
-    renderHeight = imgRect.width / imgRatio;
-    offsetY += (imgRect.height - renderHeight) / 2;
-  } else {
-    renderWidth = imgRect.height * imgRatio;
-    offsetX += (imgRect.width - renderWidth) / 2;
-  }
-
-  let dotLeft, dotTop;
-  if (sector === 'hi') {
-    dotLeft = 0.278; dotTop = 0.485;
-  } else if (sector === 'tpw') {
-    dotLeft = 0.258; dotTop = 0.356;
-  } else if (sector === 'phmo') {
-    // We want the dot to appear "just below the first 'u' in Honolulu"
-    // Adjusted 4% right and 2% down from original (0.31, 0.46)
-    dotLeft = 0.35; dotTop = 0.48;
-  }
-
-  const markerLayer = document.getElementById(`goes-marker-layer-${sector}`);
-  if (markerLayer) {
-    markerLayer.innerHTML = '';
-    const centerDot = document.createElement('div');
-    centerDot.className = 'goes-dot';
-    centerDot.style.left = `${offsetX + dotLeft * renderWidth}px`;
-    centerDot.style.top = `${offsetY + dotTop * renderHeight}px`;
-    markerLayer.appendChild(centerDot);
   }
 }
 
@@ -1059,19 +964,17 @@ function drawChart(id, W, H, data, defaultMn, defaultMx, opts = {}) {
       const fill = v >= 50 ? '#ff4444' : v >= 30 ? '#ffcc00' : '#00c8ff';
       svg.appendChild(svgEl('rect', { x, y, width: bW, height: bh, fill, rx: 1, opacity: 0.85 }));
 
-      // Optionally overlay text data on bars mapped to the right axis scale
-      if (opts.textData && opts.rightAxisMax !== undefined && opts.textData[i] > 0) {
-        // Find Y position for the right axis
-        const rightY = PT + cH - (opts.textData[i] / (opts.rightAxisMax || 1)) * cH;
-        // Optionally draw a small dot/indicator or just the text
-        // If we just want text positioned roughly at the bar top or at the scaled rightY:
-        // We'll place it slightly above the bar y or rightY, whichever makes more sense
-        // To be visually aligned with the right axis, we should position it at rightY
-        svgTxt(svg, opts.textData[i].toFixed(2), x + bW / 2, rightY - 4, "calc(var(--fs) * 0.9)", '#ffffff', 'middle');
-        // Let's add a small dashed line or dot so they know where the value is
-        svg.appendChild(svgEl('circle', { cx: x + bW / 2, cy: rightY, r: 2, fill: '#ffffff', opacity: 0.8 }));
-      }
     });
+
+    if (opts.textData && opts.rightAxisMax !== undefined) {
+      const overlayLineD = opts.textData.map((v, i) => {
+        const rightY = PT + cH - (v / (opts.rightAxisMax || 1)) * cH;
+        return `${i === 0 ? 'M' : 'L'}${xp(i).toFixed(1)},${rightY.toFixed(1)}`;
+      }).join(' ');
+
+      svg.appendChild(svgEl('path', { d: overlayLineD, fill: 'none', stroke: '#ffffff',
+        'stroke-width': 1.5, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'stroke-dasharray': '4,4', opacity: 0.8 }));
+    }
   } else {
     const lineD = data.map((v, i) =>
       `${i === 0 ? 'M' : 'L'}${xp(i).toFixed(1)},${yp(v).toFixed(1)}`).join(' ');
