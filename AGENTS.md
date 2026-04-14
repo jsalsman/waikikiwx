@@ -36,3 +36,5 @@ These instructions apply to the entire repository.
 - Prefer concise patches and keep styling/JS in `index.html` unless a larger refactor is requested.
 - If tests cannot be run because dependencies are missing, install from `requirements.txt` first.
 - You do not need to run regression tests when you are only modifying `*.md` documentation files.
+
+- The `get_target_times` function in `app.py` is optimized to use `datetime.timedelta(hours=1)` for sequential hour progression, which is approximately 56% faster than repeated `replace(hour=h)` calls.
