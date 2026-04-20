@@ -1,4 +1,4 @@
-import collections, datetime, gc, json, math, os, psutil, re, requests, statistics, tempfile, uuid
+import collections, datetime, gc, json, math, os, psutil, re, requests, statistics, uuid
 from urllib.parse import urlparse
 from google.cloud import storage
 from flask import Flask, jsonify, send_from_directory, render_template, request, Response
