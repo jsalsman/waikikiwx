@@ -1,5 +1,36 @@
+import sys
 import unittest
-import app
+from unittest.mock import MagicMock, patch
+
+def safe_import_app():
+    if 'app' in sys.modules:
+        return sys.modules['app']
+
+    dependencies = [
+        'psutil',
+        'google',
+        'google.cloud',
+        'google.cloud.storage',
+        'flask',
+        'requests'
+    ]
+
+    missing_mocks = {}
+    for dep in dependencies:
+        try:
+            __import__(dep)
+        except ImportError:
+            missing_mocks[dep] = MagicMock()
+
+    if missing_mocks:
+        with patch.dict(sys.modules, missing_mocks):
+            import app
+            return app
+    else:
+        import app
+        return app
+
+app = safe_import_app()
 
 class TestUtils(unittest.TestCase):
     def test_percentile(self):
