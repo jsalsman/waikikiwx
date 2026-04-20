@@ -535,12 +535,27 @@ function fmtHour(h) {
 function makeBlock(slice, label, span, nowIdx) {
   const block = document.createElement('div');
   block.className = 'block';
-  block.innerHTML = `
-    <div class="blk-lbl">
-      <div class="blk-tag">Forecast</div>
-      <div class="blk-date">${label}</div>
-      <div class="blk-span">${span}</div>
-    </div>`;
+
+  const blkLbl = document.createElement('div');
+  blkLbl.className = 'blk-lbl';
+
+  const blkTag = document.createElement('div');
+  blkTag.className = 'blk-tag';
+  blkTag.textContent = 'Forecast';
+
+  const blkDate = document.createElement('div');
+  blkDate.className = 'blk-date';
+  blkDate.textContent = label;
+
+  const blkSpan = document.createElement('div');
+  blkSpan.className = 'blk-span';
+  blkSpan.textContent = span;
+
+  blkLbl.appendChild(blkTag);
+  blkLbl.appendChild(blkDate);
+  blkLbl.appendChild(blkSpan);
+  block.appendChild(blkLbl);
+
   const table = document.createElement('table');
   const cg    = document.createElement('colgroup');
   const rlCol = document.createElement('col');
