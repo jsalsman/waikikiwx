@@ -1,4 +1,4 @@
-import collections, datetime, gc, json, math, os, psutil, re, requests, statistics, tempfile, uuid
+import collections, concurrent.futures, datetime, gc, json, math, os, psutil, re, requests, statistics, tempfile, uuid
 from urllib.parse import urlparse
 from google.cloud import storage
 from flask import Flask, jsonify, send_from_directory, render_template, request, Response
@@ -469,20 +469,27 @@ def cron_collect_forecast():
         app.logger.info("Uploaded gs://waikikiwx/%s", blob_path)
 
         cutoff = now_hst - datetime.timedelta(days=90)
-        historical_forecasts = []
-
+        blobs_to_load = []
         for hblob in bucket.list_blobs(prefix="forecast-"):
             f_time = parse_forecast_blob_time(hblob.name)
-            if f_time is None or f_time < cutoff:
-                continue
+            if f_time is not None and f_time >= cutoff:
+                blobs_to_load.append((f_time, hblob))
 
+        def load_blob(item):
+            f_time, hblob = item
             try:
                 hdata = json.loads(hblob.download_as_text())
+                return {"time": f_time, "data": hdata}
             except Exception as e:
                 app.logger.warning("Skipping unreadable blob %s: %s", hblob.name, e)
-                continue
+                return None
 
-            historical_forecasts.append({"time": f_time, "data": hdata})
+        historical_forecasts = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            results = executor.map(load_blob, blobs_to_load)
+            for res in results:
+                if res:
+                    historical_forecasts.append(res)
 
         # The just-uploaded forecast is already in list_blobs(); do not append it again.
         # If you later add a real observations feed, build observed_by_target and pass it here.
