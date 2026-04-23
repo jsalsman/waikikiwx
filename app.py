@@ -347,7 +347,7 @@ def scrape_forecast():
             golf.append('🌇')
         elif is_daytime and hours_int[i] % 2 == 0:
             if precip[i] <= 25 and speed[i] <= 30:
-                golf.append('👍')
+                golf.append('🤙🏻')
             else:
                 golf.append('👎')
         else:
