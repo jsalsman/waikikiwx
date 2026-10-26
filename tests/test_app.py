@@ -116,11 +116,27 @@ class AppTestCase(unittest.TestCase):
             'https://api.weather.gov@attacker.com/evil',
             'http://api.weather.gov/icons/test.png',
             'https://attacker.com@api.weather.gov/evil',
+            'https://api.weather.gov/other_endpoint',
+            'https://api.weather.gov/icons/../other',
+            'https://api.weather.gov/icons/%2e%2e/other',
+            'https://api.weather.gov:8443/icons/test.png'
         ]
         for url in bypasses:
             with self.subTest(url=url):
                 response = self.client.get(f'/icon?url={url}')
                 self.assertEqual(response.status_code, 403)
+
+    @patch('app.requests.get')
+    def test_icon_invalid_content_type(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.content = b"<html>evil</html>"
+        mock_resp.headers = {'Content-Type': 'text/html'}
+        mock_get.return_value = mock_resp
+
+        response = self.client.get('/icon?url=https://api.weather.gov/icons/test.png')
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.data, b"Invalid content type")
 
     @patch('app.get_forecast_urls')
     @patch('app.requests.get')
