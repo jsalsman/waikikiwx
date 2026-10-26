@@ -118,7 +118,8 @@ class AppTestCase(unittest.TestCase):
             'https://attacker.com@api.weather.gov/evil',
             'https://api.weather.gov/other_endpoint',
             'https://api.weather.gov/icons/../other',
-            'https://api.weather.gov/icons/%2e%2e/other'
+            'https://api.weather.gov/icons/%2e%2e/other',
+            'https://api.weather.gov:8443/icons/test.png'
         ]
         for url in bypasses:
             with self.subTest(url=url):

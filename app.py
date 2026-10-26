@@ -603,6 +603,9 @@ def fetch_icon():
         if parsed.scheme != 'https' or parsed.hostname != 'api.weather.gov':
             return "Invalid URL domain", 403
 
+        if parsed.port is not None:
+            return "Custom ports not allowed", 403
+
         if parsed.username or parsed.password:
             return "URL credentials not allowed", 403
 
