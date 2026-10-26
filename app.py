@@ -246,14 +246,25 @@ def map_grid_series_to_hourly(series_values, hourly_dts, converter=None):
         end_dt = start_dt + datetime.timedelta(hours=dur_h)
         parsed_series.append((start_dt, end_dt, val))
 
+    parsed_series.sort(key=lambda x: x[0])
+
     res = []
+    ptr = 0
+    num_series = len(parsed_series)
+
     for dt in hourly_dts:
         matched_val = None
-        for start_dt, end_dt, val in parsed_series:
-            # We assume dt is timezone aware and so are start_dt/end_dt
-            if start_dt <= dt < end_dt:
-                matched_val = val
+
+        while ptr < num_series and parsed_series[ptr][1] <= dt:
+            ptr += 1
+
+        temp_ptr = ptr
+        while temp_ptr < num_series and parsed_series[temp_ptr][0] <= dt:
+            if dt < parsed_series[temp_ptr][1]:
+                matched_val = parsed_series[temp_ptr][2]
                 break
+            temp_ptr += 1
+
         if matched_val is not None and converter is not None:
             matched_val = converter(matched_val)
         res.append(matched_val)
