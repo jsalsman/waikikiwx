@@ -1,5 +1,6 @@
-import collections, concurrent.futures, datetime, gc, json, math, os, psutil, re, requests, statistics, tempfile, uuid
+import collections, concurrent.futures, datetime, gc, json, math, os, posixpath, psutil, re, requests, statistics, tempfile, uuid
 from urllib.parse import urlparse
+import urllib.parse
 from google.cloud import storage
 from flask import Flask, jsonify, send_from_directory, render_template, request, Response
 
@@ -599,17 +600,33 @@ def fetch_icon():
 
     try:
         parsed = urlparse(url)
-        if parsed.scheme != 'https' or parsed.netloc != 'api.weather.gov':
+        if parsed.scheme != 'https' or parsed.hostname != 'api.weather.gov':
             return "Invalid URL domain", 403
+
+        if parsed.username or parsed.password:
+            return "URL credentials not allowed", 403
+
+        path = urllib.parse.unquote(parsed.path)
+        path = path.replace('\\', '/')
+        path = posixpath.normpath(path)
+
+        if not path.startswith('/icons/'):
+            return "Invalid path", 403
     except Exception:
         return "Invalid URL format", 400
 
     try:
         # NWS blocks standard User-Agents, spoofing it here
         req_headers = {'User-Agent': HEADERS['User-Agent']}
-        resp = requests.get(url, headers=req_headers, timeout=15)
+        resp = requests.get(url, headers=req_headers, timeout=15, allow_redirects=False)
         resp.raise_for_status()
-        return Response(resp.content, content_type=resp.headers.get('Content-Type'))
+
+        content_type = resp.headers.get('Content-Type', '')
+        if not content_type.startswith('image/'):
+            app.logger.error(f"Invalid Content-Type {content_type} from {url}")
+            return "Invalid content type", 502
+
+        return Response(resp.content, content_type=content_type)
     except Exception as e:
         app.logger.error(f"Failed to fetch icon from {url}: {e}")
         return "Failed to fetch icon", 502
